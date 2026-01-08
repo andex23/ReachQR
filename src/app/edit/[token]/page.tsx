@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { countries, Country } from '@/lib/countries';
 import { formatE164 } from '@/lib/utils';
+import QRCode from 'qrcode';
 
 interface Profile {
     id: string;
@@ -50,6 +51,8 @@ export default function EditPage() {
     const [website, setWebsite] = useState('');
     const [address, setAddress] = useState('');
     const [selectedCountry, setSelectedCountry] = useState<Country>(countries[0]);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [publicUrl, setPublicUrl] = useState('');
 
     // Extract handle from URL
     const extractHandle = (url: string | null, platform: string) => {
@@ -120,6 +123,22 @@ export default function EditPage() {
 
         if (token) fetchProfile();
     }, [token]);
+
+    // Generate QR code when profile loads
+    useEffect(() => {
+        if (profile && canvasRef.current && typeof window !== 'undefined') {
+            const url = `${window.location.origin}/u/${profile.slug}`;
+            setPublicUrl(url);
+            QRCode.toCanvas(canvasRef.current, url, {
+                width: 200,
+                margin: 2,
+                color: {
+                    dark: '#1A1A1A',
+                    light: '#FAF9F6',
+                },
+            });
+        }
+    }, [profile]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -216,6 +235,31 @@ export default function EditPage() {
                     >
                         View live page →
                     </Link>
+                </div>
+
+                {/* QR Code Section */}
+                <div className="card mb-6">
+                    <h2 className="font-medium text-ink text-sm uppercase tracking-wide mb-4">Your QR Code</h2>
+                    <div className="flex flex-col items-center gap-4">
+                        <canvas ref={canvasRef} className="rounded-xl border border-border" />
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (canvasRef.current) {
+                                    const link = document.createElement('a');
+                                    link.download = `${profile.slug}-qr-code.png`;
+                                    link.href = canvasRef.current.toDataURL('image/png');
+                                    link.click();
+                                }
+                            }}
+                            className="w-full py-3 px-6 rounded-xl bg-ink text-milk font-medium transition-all hover:bg-ink/90 flex items-center justify-center gap-2"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                            Download QR Code
+                        </button>
+                    </div>
                 </div>
 
                 {/* Form */}
