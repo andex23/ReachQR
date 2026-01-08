@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { getSupabase, Profile } from '@/lib/supabase';
 import { generateWhatsAppLink, generateMapsLink } from '@/lib/utils';
+import ViewTracker from '@/components/ViewTracker';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,6 +107,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
 
     return (
         <main className="min-h-screen py-8 px-4 md:py-20 flex items-center justify-center">
+            <ViewTracker slug={slug} />
             <div className="w-full max-w-sm mx-auto bg-white border-2 border-ink rounded-2xl p-6 md:p-8 shadow-[6px_6px_0px_0px_rgba(26,26,26,1)]">
                 {/* Profile Card */}
                 <div className="text-center">

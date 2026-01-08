@@ -47,4 +47,5 @@ export interface Profile {
     edit_token_hash: string;
     created_at: string;
     updated_at: string;
+    views: number;
 }

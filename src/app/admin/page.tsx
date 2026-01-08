@@ -10,8 +10,9 @@ interface Profile {
     email: string;
     whatsapp_e164: string;
     created_at: string;
-    edit_token_hash: string; // We won't use this directly, but good to know it exists
+    edit_token_hash: string;
     logo_url: string | null;
+    views: number;
 }
 
 export default function AdminPage() {
@@ -204,6 +205,36 @@ export default function AdminPage() {
                     </div>
                 </div>
 
+                {/* Signups Chart - Last 7 Days */}
+                <div className="bg-white p-6 rounded-xl border border-border shadow-sm mb-8">
+                    <p className="text-sm font-medium text-ink/50 mb-4">Signups - Last 7 Days</p>
+                    <div className="flex items-end gap-2 h-32">
+                        {(() => {
+                            const days = [];
+                            for (let i = 6; i >= 0; i--) {
+                                const date = new Date();
+                                date.setDate(date.getDate() - i);
+                                const dateStr = date.toDateString();
+                                const count = profiles.filter(p =>
+                                    new Date(p.created_at).toDateString() === dateStr
+                                ).length;
+                                days.push({ date, count, label: date.toLocaleDateString('en', { weekday: 'short' }) });
+                            }
+                            const maxCount = Math.max(...days.map(d => d.count), 1);
+                            return days.map((day, idx) => (
+                                <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+                                    <div
+                                        className="w-full bg-ink/80 rounded-t transition-all"
+                                        style={{ height: `${(day.count / maxCount) * 100}%`, minHeight: day.count > 0 ? '8px' : '2px' }}
+                                    />
+                                    <span className="text-[10px] text-ink/50">{day.label}</span>
+                                    <span className="text-xs font-medium text-ink">{day.count}</span>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+                </div>
+
                 {/* Table */}
                 <div className="bg-white rounded-xl border border-border overflow-hidden shadow-sm">
                     <div className="overflow-x-auto">
@@ -212,7 +243,7 @@ export default function AdminPage() {
                                 <tr className="bg-gray-50/50 border-b border-border text-xs uppercase text-ink/50 font-medium tracking-wide">
                                     <th className="px-6 py-4">Business</th>
                                     <th className="px-6 py-4">Contact</th>
-                                    <th className="px-6 py-4">Status</th>
+                                    <th className="px-6 py-4">👁️ Views</th>
                                     <th className="px-6 py-4">Joined</th>
                                     <th className="px-6 py-4 text-right">Action</th>
                                 </tr>
@@ -253,8 +284,8 @@ export default function AdminPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-100">
-                                                Active
+                                            <span className="text-sm font-medium text-ink">
+                                                {profile.views || 0}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-ink/60 whitespace-nowrap">
