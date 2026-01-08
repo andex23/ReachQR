@@ -120,16 +120,16 @@ function SuccessContent() {
                                 if (!blob) return;
 
                                 const file = new File([blob], 'reach-qr-code.png', { type: 'image/png' });
-                                const shareData = {
-                                    files: [file],
-                                    title: 'My ReachQR',
-                                    text: `Scan to connect with ${slug}!`,
-                                    url: publicUrl
-                                };
 
+                                // Check if sharing files is supported
                                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                                    await navigator.share(shareData);
+                                    await navigator.share({
+                                        files: [file],
+                                        title: 'My ReachQR',
+                                        text: `Scan to connect with ${slug}!`
+                                    });
                                 } else {
+                                    // Fallback to link sharing
                                     await navigator.share({
                                         title: 'My ReachQR',
                                         text: `Check out my contact page: ${publicUrl}`,
