@@ -12,10 +12,11 @@ interface PageProps {
 
 async function getProfile(slug: string): Promise<Profile | null> {
     const supabase = getSupabase();
+    // Ensure slug is lowercase for lookup
     const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('slug', slug)
+        .eq('slug', slug.toLowerCase())
         .single();
 
     if (error || !data) return null;
