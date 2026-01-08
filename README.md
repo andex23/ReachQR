@@ -39,21 +39,7 @@ npm install
 
 ### 3. Configure Environment
 
-Create a `.env.local` file:
-
-```bash
-cp .env.example .env.local
-```
-
-Fill in your credentials:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-RESEND_API_KEY=your-resend-api-key
-NEXT_PUBLIC_BASE_URL=http://localhost:3000
-```
+Duplicate `.env.example` to create `.env.local` and populate it with your Supabase and Resend credentials.
 
 ### 4. Run Development Server
 
@@ -61,7 +47,7 @@ NEXT_PUBLIC_BASE_URL=http://localhost:3000
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open the application in your browser.
 
 ## Routes
 
