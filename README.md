@@ -1,4 +1,4 @@
-# Reach
+# ReachQR
 
 A QR contact page generator for small businesses and freelancers. Create a beautiful QR code that opens a clean contact page with WhatsApp, phone, email, and more.
 
@@ -7,8 +7,11 @@ A QR contact page generator for small businesses and freelancers. Create a beaut
 - 🚀 **Fast Setup** - Create a contact page in seconds, no account required
 - 📱 **QR Code Generation** - Download a high-quality PNG QR code
 - 💬 **WhatsApp Integration** - Primary CTA with pre-filled message
+- 🖼️ **Logo Support** - Add your business logo or use a generated letter avatar
+- 🔗 **Social Links** - Instagram, TikTok, X (Twitter), LinkedIn, and Website
 - 🔒 **Secure Edit Links** - Edit your page anytime with a private token
 - 🎨 **Beautiful Design** - Warm, minimalist aesthetic with micro-interactions
+- 📱 **Responsive** - Optimized for all devices
 
 ## Tech Stack
 
@@ -16,6 +19,7 @@ A QR contact page generator for small businesses and freelancers. Create a beaut
 - **Styling**: Tailwind CSS
 - **Database**: Supabase (PostgreSQL)
 - **QR Generation**: [qrcode](https://www.npmjs.com/package/qrcode)
+- **Email**: Resend (for edit link recovery)
 
 ## Getting Started
 
@@ -40,12 +44,14 @@ Create a `.env.local` file:
 cp .env.example .env.local
 ```
 
-Fill in your Supabase credentials:
+Fill in your credentials:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+RESEND_API_KEY=your-resend-api-key
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ```
 
 ### 4. Run Development Server
@@ -60,11 +66,12 @@ Open [http://localhost:3000](http://localhost:3000)
 
 | Route | Description |
 |-------|-------------|
-| `/` | Redirects to `/create` |
+| `/` | Landing page |
 | `/create` | Create a new contact page |
 | `/success` | Shows QR code and edit link |
 | `/edit/[token]` | Edit an existing page |
 | `/u/[slug]` | Public profile page |
+| `/recover` | Recover lost edit links |
 
 ## Database Schema
 
@@ -74,11 +81,21 @@ CREATE TABLE profiles (
   slug text UNIQUE NOT NULL,
   business_name text NOT NULL,
   tagline text,
+  logo_url text,           -- New!
   whatsapp_e164 text NOT NULL,
   phone text,
   email text,
+  -- Socials
   instagram_url text,
+  twitter_url text,
+  tiktok_url text,
+  facebook_url text,
+  linkedin_url text,       -- New!
+  youtube_url text,
+  website_url text,
+  -- Location
   address text,
+  -- Security
   edit_token_hash text NOT NULL,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
