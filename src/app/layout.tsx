@@ -13,8 +13,13 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en">
-            <body className="min-h-screen bg-milk">
-                {children}
+            <body className="min-h-screen bg-milk flex flex-col">
+                <div className="flex-1">
+                    {children}
+                </div>
+                <footer className="py-6 text-center text-xs text-ink/30 font-mono uppercase tracking-widest">
+                    © {new Date().getFullYear()} AVD Studios
+                </footer>
             </body>
         </html>
     );
