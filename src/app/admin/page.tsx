@@ -216,6 +216,7 @@ export default function AdminPage() {
                     >
                         Logout
                     </button>
+                </div>
             </nav>
 
             {/* Dashboard */}
