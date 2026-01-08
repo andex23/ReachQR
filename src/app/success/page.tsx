@@ -100,15 +100,54 @@ function SuccessContent() {
                 </div>
 
                 {/* 3. Download QR button */}
-                <button
-                    onClick={handleDownload}
-                    className="w-full py-4 px-6 rounded-xl bg-ink text-milk font-medium transition-all hover:bg-ink/90 flex items-center justify-center gap-2 mb-4"
-                >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                    </svg>
-                    Download QR Code
-                </button>
+                <div className="flex flex-col md:flex-row gap-3 mb-6">
+                    <button
+                        onClick={handleDownload}
+                        className="flex-1 py-3 px-6 rounded-xl bg-ink text-milk font-medium transition-all hover:bg-ink/90 flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                        Download
+                    </button>
+                    <button
+                        onClick={async () => {
+                            if (!canvasRef.current) return;
+                            try {
+                                const blob = await new Promise<Blob | null>(resolve =>
+                                    canvasRef.current!.toBlob(resolve, 'image/png')
+                                );
+                                if (!blob) return;
+
+                                const file = new File([blob], 'reach-qr-code.png', { type: 'image/png' });
+                                const shareData = {
+                                    files: [file],
+                                    title: 'My ReachQR',
+                                    text: `Scan to connect with ${slug}!`,
+                                    url: publicUrl
+                                };
+
+                                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                                    await navigator.share(shareData);
+                                } else {
+                                    await navigator.share({
+                                        title: 'My ReachQR',
+                                        text: `Check out my contact page: ${publicUrl}`,
+                                        url: publicUrl
+                                    });
+                                }
+                            } catch (err) {
+                                console.error('Share failed', err);
+                            }
+                        }}
+                        className="flex-1 py-3 px-6 rounded-xl border border-border text-ink font-medium transition-all hover:bg-ink/5 flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.287.696.345 1.093m0-3.186a4.125 4.125 0 117.964-5.416m-9.215 0c-.967.628-1.542 1.745-1.542 3V9.75M7.5 12h.008v.008H7.5V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm9.75 5.25h.008v.008H17.625v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                        </svg>
+                        Share
+                    </button>
+                </div>
 
                 {/* 4. Public link with copy button */}
                 <div className="border border-border rounded-xl p-4 mb-4">
