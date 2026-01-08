@@ -34,7 +34,8 @@ npm install
 
 1. Create a new project at [supabase.com](https://supabase.com)
 2. Go to **SQL Editor** and run the contents of `supabase-schema.sql`
-3. Go to **Settings > API** and copy your keys
+3. **Important**: Also run the contents of `setup-storage.sql` to enable file uploads
+4. Go to **Settings > API** and copy your keys
 
 ### 3. Configure Environment
 
