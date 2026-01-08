@@ -23,6 +23,8 @@ export default function AdminPage() {
     const [error, setError] = useState('');
 
     const [searchQuery, setSearchQuery] = useState('');
+    const [sendingEmails, setSendingEmails] = useState(false);
+    const [emailResult, setEmailResult] = useState<{ sent: number; failed: number } | null>(null);
 
     // Check session on mount
     useEffect(() => {
@@ -107,6 +109,36 @@ export default function AdminPage() {
         return diffDays <= 7;
     }).length;
 
+    const handleSendEmails = async () => {
+        if (!confirm(`Send notification emails to ALL ${profiles.length} users? This cannot be undone.`)) return;
+
+        const pwd = localStorage.getItem('reach_admin_key');
+        if (!pwd) return;
+
+        setSendingEmails(true);
+        setEmailResult(null);
+
+        try {
+            const res = await fetch('/api/admin/notify-all', {
+                method: 'POST',
+                headers: { 'x-admin-password': pwd }
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                setEmailResult({ sent: data.sent, failed: data.failed });
+                alert(`Emails sent! ✅ ${data.sent} sent, ${data.failed} failed`);
+            } else {
+                alert('Failed to send emails');
+            }
+        } catch (err) {
+            alert('Error sending emails');
+        }
+
+        setSendingEmails(false);
+    };
+
     if (!isAuthenticated) {
         return (
             <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -156,12 +188,34 @@ export default function AdminPage() {
                     </Link>
                     <span className="bg-ink/5 px-2 py-0.5 rounded text-xs font-mono text-ink/60">ADMIN</span>
                 </div>
-                <button
-                    onClick={handleLogout}
-                    className="text-sm text-ink/60 hover:text-ink hover:underline"
-                >
-                    Logout
-                </button>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={handleSendEmails}
+                        disabled={sendingEmails || profiles.length === 0}
+                        className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {sendingEmails ? (
+                            <>
+                                <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Sending...
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                                </svg>
+                                Email All
+                            </>
+                        )}
+                    </button>
+                    <button
+                        onClick={handleLogout}
+                        className="text-sm text-ink/60 hover:text-ink hover:underline"
+                    >
+                        Logout
+                    </button>
             </nav>
 
             {/* Dashboard */}
