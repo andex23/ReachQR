@@ -9,7 +9,7 @@ type Step = {
     id: string;
     question: string;
     subtext?: string;
-    type: 'text' | 'email' | 'tel' | 'social' | 'country-phone';
+    type: 'text' | 'email' | 'tel' | 'social' | 'country-phone' | 'file';
     placeholder?: string;
     required?: boolean;
     skipText?: string;
@@ -19,7 +19,7 @@ type Step = {
 const steps: Step[] = [
     { id: 'businessName', question: "What's your business name?", type: 'text', placeholder: 'Acme Design Studio', required: true },
     { id: 'tagline', question: "What do you do?", subtext: 'Example: "Graphic design & branding"', type: 'text', placeholder: 'Graphic design & branding', skipText: 'Skip', maxLength: 60 },
-    { id: 'logoUrl', question: "Do you have a logo?", subtext: 'Paste a link to your logo image (square works best)', type: 'text', placeholder: 'https://example.com/logo.png', skipText: "I'll add it later" },
+    { id: 'logoUrl', question: "Do you have a logo?", subtext: 'Upload your logo image (square works best)', type: 'file', placeholder: '', skipText: "I'll add it later" },
     { id: 'email', question: "What's your email?", type: 'email', placeholder: 'hello@yourbusiness.com', required: true },
     { id: 'whatsapp', question: "What's your WhatsApp number?", type: 'country-phone', placeholder: '8012345678', required: true },
     { id: 'phone', question: "Any other phone number?", type: 'tel', placeholder: '+234 801 234 5678', skipText: 'Skip' },
@@ -38,10 +38,37 @@ export default function CreatePage() {
     const [error, setError] = useState('');
     const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
     const [checkingSlug, setCheckingSlug] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
 
     const [formData, setFormData] = useState<Record<string, string>>({});
     const [currentValue, setCurrentValue] = useState('');
     const [selectedCountry, setSelectedCountry] = useState<Country>(getDefaultCountry());
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (data.url) {
+                setCurrentValue(data.url);
+            } else {
+                setError('Upload failed: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            setError('Upload failed');
+        }
+        setIsUploading(false);
+    };
 
     const step = steps[currentStep];
     const isLastStep = currentStep === steps.length - 1;
@@ -232,6 +259,46 @@ export default function CreatePage() {
                                 className="input-field flex-1 text-lg"
                                 autoFocus
                             />
+                        </div>
+                    ) : step.type === 'file' ? (
+                        <div className="mb-4">
+                            {currentValue ? (
+                                <div className="relative w-32 h-32 mx-auto mb-4 border border-border rounded-xl overflow-hidden group bg-white shadow-sm">
+                                    <img src={currentValue} alt="Logo preview" className="w-full h-full object-cover" />
+                                    <button
+                                        onClick={() => setCurrentValue('')}
+                                        className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity font-medium text-sm"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        accept="image/png, image/jpeg, image/jpg, image/webp"
+                                        onChange={handleFileUpload}
+                                        className="hidden"
+                                        id="logo-upload"
+                                        disabled={isUploading}
+                                    />
+                                    <label
+                                        htmlFor="logo-upload"
+                                        className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-xl cursor-pointer hover:bg-ink/5 transition-colors ${isUploading ? 'opacity-50 cursor-wait' : ''}`}
+                                    >
+                                        {isUploading ? (
+                                            <span className="text-sm font-medium text-ink/60 animate-pulse">Uploading...</span>
+                                        ) : (
+                                            <>
+                                                <svg className="w-8 h-8 text-ink/40 mb-2" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                                                </svg>
+                                                <span className="text-sm font-medium text-ink/60">Tap to upload logo</span>
+                                            </>
+                                        )}
+                                    </label>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <input

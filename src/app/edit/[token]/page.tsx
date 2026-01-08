@@ -41,6 +41,7 @@ export default function EditPage() {
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
     const [logoUrl, setLogoUrl] = useState('');
+    const [isUploading, setIsUploading] = useState(false);
     const [instagram, setInstagram] = useState('');
     const [twitter, setTwitter] = useState('');
     const [tiktok, setTiktok] = useState('');
@@ -251,15 +252,69 @@ export default function EditPage() {
                         </div>
 
                         <div>
-                            <label htmlFor="logoUrl" className="label">Logo URL (optional)</label>
-                            <input
-                                id="logoUrl"
-                                type="url"
-                                value={logoUrl}
-                                onChange={(e) => setLogoUrl(e.target.value)}
-                                className="input-field"
-                                placeholder="https://example.com/logo.png"
-                            />
+                            <label htmlFor="logoUrl" className="label">Logo (optional)</label>
+                            {logoUrl ? (
+                                <div className="relative w-24 h-24 mb-4 border border-border rounded-xl overflow-hidden group bg-white shadow-sm">
+                                    <img src={logoUrl} alt="Logo preview" className="w-full h-full object-cover" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setLogoUrl('')}
+                                        className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity font-medium text-xs"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="relative max-w-xs">
+                                    <input
+                                        type="file"
+                                        accept="image/png, image/jpeg, image/jpg, image/webp"
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+
+                                            setIsUploading(true);
+                                            const formData = new FormData();
+                                            formData.append('file', file);
+
+                                            try {
+                                                const res = await fetch('/api/upload', {
+                                                    method: 'POST',
+                                                    body: formData
+                                                });
+                                                const data = await res.json();
+                                                if (data.url) {
+                                                    setLogoUrl(data.url);
+                                                } else {
+                                                    setError('Upload failed: ' + (data.error || 'Unknown error'));
+                                                }
+                                            } catch (error) {
+                                                console.error('Upload error:', error);
+                                                setError('Upload failed');
+                                            }
+                                            setIsUploading(false);
+                                        }}
+                                        className="hidden"
+                                        id="logo-upload-edit"
+                                        disabled={isUploading}
+                                    />
+                                    <label
+                                        htmlFor="logo-upload-edit"
+                                        className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-border rounded-xl cursor-pointer hover:bg-ink/5 transition-colors ${isUploading ? 'opacity-50 cursor-wait' : ''}`}
+                                    >
+                                        {isUploading ? (
+                                            <span className="text-xs font-medium text-ink/60 animate-pulse">Uploading...</span>
+                                        ) : (
+                                            <>
+                                                <svg className="w-6 h-6 text-ink/40 mb-1" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                                                </svg>
+                                                <span className="text-xs font-medium text-ink/60">Upload Logo</span>
+                                            </>
+                                        )}
+                                    </label>
+                                </div>
+                            )}
                             <p className="text-xs text-ink/50 mt-1">Square image works best (e.g. 200x200px)</p>
                         </div>
                     </div>
@@ -436,7 +491,7 @@ export default function EditPage() {
                         {saving ? 'Saving...' : 'Save Changes'}
                     </button>
                 </form>
-            </div>
-        </main>
+            </div >
+        </main >
     );
 }

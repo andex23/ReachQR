@@ -105,8 +105,8 @@ export default async function PublicProfilePage({ params }: PageProps) {
     ].filter(s => s.url);
 
     return (
-        <main className="min-h-screen py-12 px-4 md:py-20">
-            <div className="max-w-sm mx-auto">
+        <main className="min-h-screen py-8 px-4 md:py-20 flex items-center justify-center">
+            <div className="w-full max-w-sm mx-auto bg-white border-2 border-ink rounded-2xl p-6 md:p-8 shadow-[6px_6px_0px_0px_rgba(26,26,26,1)]">
                 {/* Profile Card */}
                 <div className="text-center">
                     {/* Avatar or Logo */}
