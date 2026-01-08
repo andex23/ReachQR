@@ -67,6 +67,45 @@ export default function AdminPage() {
         setPassword('');
     };
 
+    const handleDelete = async (id: string, name: string) => {
+        if (!confirm(`Are you sure you want to delete "${name}"? This cannot be undone.`)) return;
+
+        const pwd = localStorage.getItem('reach_admin_key');
+        if (!pwd) return;
+
+        try {
+            const res = await fetch('/api/admin/profiles', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-admin-password': pwd
+                },
+                body: JSON.stringify({ id })
+            });
+
+            if (res.ok) {
+                setProfiles(prev => prev.filter(p => p.id !== id));
+            } else {
+                alert('Failed to delete profile');
+            }
+        } catch (err) {
+            alert('Error deleting profile');
+        }
+    };
+
+    // Analytics Calculation
+    const totalProfiles = profiles.length;
+    const profilesToday = profiles.filter(p =>
+        new Date(p.created_at).toDateString() === new Date().toDateString()
+    ).length;
+    const profilesWeek = profiles.filter(p => {
+        const date = new Date(p.created_at);
+        const now = new Date();
+        const diffTime = Math.abs(now.getTime() - date.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays <= 7;
+    }).length;
+
     if (!isAuthenticated) {
         return (
             <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -127,7 +166,10 @@ export default function AdminPage() {
             {/* Dashboard */}
             <div className="max-w-6xl mx-auto py-8 px-4 md:px-8 flex-1 w-full">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                    <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
+                    <div>
+                        <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
+                        <p className="text-ink/50 text-sm mt-1">Manage your users and view stats</p>
+                    </div>
 
                     <div className="flex items-center gap-4">
                         {/* Search */}
@@ -143,10 +185,22 @@ export default function AdminPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                             </svg>
                         </div>
+                    </div>
+                </div>
 
-                        <div className="bg-white px-4 py-2 rounded-lg border border-border text-sm font-medium whitespace-nowrap">
-                            Total: {profiles.length} (Filtered: {filteredProfiles.length})
-                        </div>
+                {/* Analytics Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div className="bg-white p-6 rounded-xl border border-border shadow-sm">
+                        <p className="text-sm font-medium text-ink/50 mb-1">Total Profiles</p>
+                        <p className="text-3xl font-semibold text-ink">{totalProfiles}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl border border-border shadow-sm">
+                        <p className="text-sm font-medium text-ink/50 mb-1">Created Today</p>
+                        <p className="text-3xl font-semibold text-ink">{profilesToday}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl border border-border shadow-sm">
+                        <p className="text-sm font-medium text-ink/50 mb-1">Last 7 Days</p>
+                        <p className="text-3xl font-semibold text-ink">{profilesWeek}</p>
                     </div>
                 </div>
 
@@ -207,13 +261,32 @@ export default function AdminPage() {
                                             {new Date(profile.created_at).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <a
-                                                href={`/u/${profile.slug}`}
-                                                target="_blank"
-                                                className="text-sm font-medium text-ink/60 hover:text-ink hover:underline"
-                                            >
-                                                View
-                                            </a>
+                                            <div className="flex items-center justify-end gap-3">
+                                                <a
+                                                    href={`/u/${profile.slug}`}
+                                                    target="_blank"
+                                                    className="text-sm font-medium text-ink/60 hover:text-ink hover:underline"
+                                                >
+                                                    View
+                                                </a>
+                                                <a
+                                                    href={`/edit/${profile.edit_token_hash}`} // Hash isn't useful for edit, but we don't have clear token here. Actually we only stored hash. We can't edit.
+                                                    // Wait, in previous step I saw 'edit_token_hash'. We can't use it to generate edit link.
+                                                    // But we have 'Add ability to view/copy edit links for support' in task.md?
+                                                    // Ah, task.md said "Add ability to view/copy edit links". But if we only store hash, we can't recover it.
+                                                    // Unless we have a recover logic.
+                                                    // For now, I'll just keep "View".
+                                                    // Admin can DELETE.
+                                                    // The user requested "add delete feature".
+                                                    className="text-sm font-medium text-red-600 hover:text-red-700 hover:underline cursor-pointer"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        handleDelete(profile.id, profile.business_name);
+                                                    }}
+                                                >
+                                                    Delete
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
