@@ -27,8 +27,8 @@ export default function HowItWorks() {
                     </svg>
                 </button>
 
-                <div className={`grid md:grid-cols-3 gap-8 text-center md:text-left transition-all duration-300 ${isOpen ? 'block' : 'hidden md:grid'}`}>
-                    <div className="flex flex-col items-center md:items-start gap-4">
+                <div className={`grid md:grid-cols-3 gap-8 text-center transition-all duration-300 ${isOpen ? 'block' : 'hidden md:grid'}`}>
+                    <div className="flex flex-col items-center gap-4">
                         <div className="w-10 h-10 bg-ink text-milk rounded-full flex items-center justify-center font-mono text-lg flex-shrink-0">
                             1
                         </div>
@@ -38,7 +38,7 @@ export default function HowItWorks() {
                         </div>
                     </div>
 
-                    <div className="flex flex-col items-center md:items-start gap-4">
+                    <div className="flex flex-col items-center gap-4">
                         <div className="w-10 h-10 bg-ink text-milk rounded-full flex items-center justify-center font-mono text-lg flex-shrink-0">
                             2
                         </div>
@@ -48,7 +48,7 @@ export default function HowItWorks() {
                         </div>
                     </div>
 
-                    <div className="flex flex-col items-center md:items-start gap-4">
+                    <div className="flex flex-col items-center gap-4">
                         <div className="w-10 h-10 bg-ink text-milk rounded-full flex items-center justify-center font-mono text-lg flex-shrink-0">
                             3
                         </div>
