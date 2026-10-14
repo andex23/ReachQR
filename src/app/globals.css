@@ -1,67 +1,87 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   html {
-    font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
-    @apply bg-milk text-ink min-h-screen;
+    @apply bg-paper text-ink font-sans;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'JetBrains Mono', monospace;
-    @apply font-medium;
+  h1, h2, h3 {
+    @apply font-display tracking-tight;
+  }
+
+  ::selection {
+    @apply bg-accent text-ink;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-ink ring-offset-2 ring-offset-paper;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
 @layer components {
-  .input-field {
-    @apply w-full px-4 py-3 rounded-xl border border-border bg-white
-           text-ink placeholder:text-ink/40
-           focus:outline-none focus:ring-2 focus:ring-ink/20 focus:border-ink
-           transition-all duration-200;
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 font-semibold
+           border-2 border-ink transition-all duration-150 ease-out
+           disabled:opacity-50 disabled:pointer-events-none select-none;
   }
 
   .btn-primary {
-    @apply w-full px-6 py-4 rounded-xl bg-ink text-milk font-mono font-medium
-           hover:bg-ink-light active:scale-[0.98]
-           transition-all duration-200 ease-out;
+    @apply btn bg-ink text-paper hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-hard
+           active:translate-x-0 active:translate-y-0 active:shadow-none;
+  }
+
+  .btn-accent {
+    @apply btn bg-accent text-ink shadow-hard hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-hard-lg
+           active:translate-x-0.5 active:translate-y-0.5 active:shadow-hard-sm;
   }
 
   .btn-secondary {
-    @apply w-full px-6 py-4 rounded-xl bg-white text-ink font-mono font-medium
-           border border-border
-           hover:border-ink hover:bg-milk active:scale-[0.98]
-           transition-all duration-200 ease-out;
+    @apply btn bg-white text-ink hover:bg-paper;
   }
 
-  .cta-button {
-    @apply flex items-center justify-center gap-3 w-full px-6 py-5 rounded-2xl
-           bg-white text-ink font-mono font-medium text-lg
-           border border-border
-           hover:border-ink hover:shadow-sm active:scale-[0.98]
-           transition-all duration-200 ease-out;
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium text-muted
+           hover:text-ink hover:bg-ink/5 transition-colors;
   }
 
-  .cta-button-primary {
-    @apply flex items-center justify-center gap-3 w-full px-6 py-5 rounded-2xl
-           bg-ink text-milk font-mono font-medium text-lg
-           hover:bg-ink-light active:scale-[0.98]
-           transition-all duration-200 ease-out;
-  }
-
-  .card {
-    @apply bg-white rounded-2xl border border-border p-6 md:p-8;
+  .input {
+    @apply w-full rounded-xl border-2 border-line bg-white px-4 py-3 text-ink
+           placeholder:text-ink/35 transition-colors
+           focus:border-ink focus:outline-none focus:ring-0;
   }
 
   .label {
-    @apply block text-sm font-medium text-ink/70 mb-2;
+    @apply mb-1.5 block text-sm font-semibold text-ink;
+  }
+
+  .hint {
+    @apply mt-1.5 text-xs text-muted;
+  }
+
+  .card {
+    @apply rounded-2xl border-2 border-ink bg-white p-6 shadow-hard md:p-8;
+  }
+
+  .eyebrow {
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-white px-3 py-1 text-xs font-semibold;
   }
 }

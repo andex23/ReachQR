@@ -1,31 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServiceClient } from '@/lib/supabase';
+import { getClientIp, handleRouteError, rateLimit, tooManyRequests } from '@/lib/server-utils';
+import { isValidSlug } from '@/lib/profile';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-    const slug = request.nextUrl.searchParams.get('slug');
+    try {
+        const slug = (request.nextUrl.searchParams.get('slug') || '').trim().toLowerCase();
+        if (!isValidSlug(slug)) return NextResponse.json({ available: false, valid: false });
 
-    if (!slug) {
-        return NextResponse.json(
-            { error: 'Slug is required' },
-            { status: 400 }
-        );
+        if (!(await rateLimit(`slug:${getClientIp(request)}`, 60, 60))) return tooManyRequests();
+
+        const { data, error } = await getServiceClient()
+            .from('profiles')
+            .select('id')
+            .eq('slug', slug)
+            .maybeSingle();
+
+        if (error) throw error;
+        return NextResponse.json({ available: !data, valid: true });
+    } catch (error) {
+        return handleRouteError(error, 'Check slug');
     }
-
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('slug', slug)
-        .maybeSingle();
-
-    if (error) {
-        console.error('Supabase error:', error);
-        return NextResponse.json(
-            { error: 'Failed to check slug' },
-            { status: 500 }
-        );
-    }
-
-    return NextResponse.json({
-        available: !data,
-    });
 }

@@ -1,26 +1,37 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { Bricolage_Grotesque, Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 
+const display = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-display', display: 'swap' });
+const sans = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
+const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
+
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+
 export const metadata: Metadata = {
-    title: 'Reach - Create Your QR Contact Page',
-    description: 'Create a beautiful QR code that opens your contact page. Perfect for small businesses and freelancers.',
+    metadataBase: new URL(baseUrl),
+    title: {
+        default: 'ReachQR — One scan. Instant contact.',
+        template: '%s · ReachQR',
+    },
+    description:
+        'Create a free contact page and QR code for your business in 60 seconds. WhatsApp, call, email, socials and directions — one scan away.',
+    openGraph: {
+        title: 'ReachQR — One scan. Instant contact.',
+        description: 'A free contact page and QR code for your business in 60 seconds.',
+        siteName: 'ReachQR',
+        type: 'website',
+    },
 };
 
-export default function RootLayout({
-    children,
-}: {
-    children: React.ReactNode;
-}) {
+export const viewport: Viewport = {
+    themeColor: '#F6F4EF',
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="en">
-            <body className="min-h-screen bg-milk flex flex-col">
-                <div className="flex-1">
-                    {children}
-                </div>
-                <footer className="py-6 text-center text-xs text-ink/30 font-mono uppercase tracking-widest">
-                    © {new Date().getFullYear()} AVD Studios
-                </footer>
-            </body>
+        <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+            <body className="min-h-screen">{children}</body>
         </html>
     );
 }

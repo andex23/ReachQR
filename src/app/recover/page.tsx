@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { SiteHeader } from '@/components/Brand';
+import { EmailIcon, KeyIcon } from '@/components/icons';
 
 export default function RecoverPage() {
     const [email, setEmail] = useState('');
@@ -9,105 +11,87 @@ export default function RecoverPage() {
     const [sent, setSent] = useState(false);
     const [error, setError] = useState('');
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const submit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError('');
-
         try {
             const res = await fetch('/api/recover', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email }),
             });
-
             const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error);
-            }
-
+            if (!res.ok) throw new Error(data.error);
             setSent(true);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Something went wrong');
+            setError(err instanceof Error && err.message ? err.message : 'Something went wrong');
         }
-
         setLoading(false);
     };
 
-    if (sent) {
-        return (
-            <main className="min-h-screen flex items-center justify-center px-4">
-                <div className="max-w-md w-full text-center">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                    <h1 className="text-2xl font-mono font-semibold text-ink mb-4">
-                        Check Your Email
-                    </h1>
-                    <p className="text-ink/60 mb-8">
-                        If a page exists with that email, we&apos;ve sent you a link to edit it.
-                    </p>
-                    <Link href="/" className="text-ink/60 hover:text-ink text-sm">
-                        ← Back to home
-                    </Link>
+    return (
+        <>
+            <SiteHeader />
+            <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12">
+                <div className="w-full max-w-md animate-fade-up">
+                    {sent ? (
+                        <div className="card text-center">
+                            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full border-2 border-ink bg-accent">
+                                <EmailIcon className="h-6 w-6" />
+                            </div>
+                            <h1 className="text-3xl font-bold">Check your inbox</h1>
+                            <p className="mt-3 text-muted">
+                                If a page uses <span className="font-semibold text-ink">{email}</span>, we’ve sent a link to get back in. It works for one hour.
+                            </p>
+                            <p className="mt-4 text-sm text-muted">Nothing there? Check spam, or try the email you used when you created the page.</p>
+                            <button type="button" onClick={() => setSent(false)} className="btn-ghost mt-6 text-sm">
+                                Use a different email
+                            </button>
+                        </div>
+                    ) : (
+                        <form onSubmit={submit} className="card space-y-6">
+                            <div>
+                                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full border-2 border-ink bg-accent">
+                                    <KeyIcon className="h-6 w-6" />
+                                </div>
+                                <h1 className="text-3xl font-bold">Edit your page</h1>
+                                <p className="mt-2 text-muted">Enter the email you used to create your page and we’ll send you a fresh edit link.</p>
+                            </div>
+                            <div>
+                                <label htmlFor="email" className="label">
+                                    Email
+                                </label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="hello@yourbusiness.com"
+                                    className="input"
+                                    autoComplete="email"
+                                    required
+                                    autoFocus
+                                />
+                            </div>
+                            {error && (
+                                <p role="alert" className="rounded-xl border-2 border-[#D23A3A] bg-[#FDECEC] px-4 py-3 text-sm font-medium text-[#8A1C1C]">
+                                    {error}
+                                </p>
+                            )}
+                            <button type="submit" disabled={loading} className="btn-primary w-full">
+                                {loading ? 'Sending…' : 'Email me a link'}
+                            </button>
+                            <p className="text-center text-sm text-muted">
+                                No page yet?{' '}
+                                <Link href="/create" className="font-semibold text-ink underline">
+                                    Create one free
+                                </Link>
+                            </p>
+                        </form>
+                    )}
                 </div>
             </main>
-        );
-    }
-
-    return (
-        <main className="min-h-screen flex items-center justify-center px-4">
-            <div className="max-w-md w-full">
-                {/* Header */}
-                <div className="text-center mb-8">
-                    <h1 className="text-3xl font-mono font-semibold text-ink mb-2">
-                        Recover Your Page
-                    </h1>
-                    <p className="text-ink/60">
-                        Enter the email you used when creating your page
-                    </p>
-                </div>
-
-                <form onSubmit={handleSubmit} className="card space-y-6">
-                    <div>
-                        <label htmlFor="email" className="label">Email</label>
-                        <input
-                            id="email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="hello@yourbusiness.com"
-                            className="input-field"
-                            required
-                            autoFocus
-                        />
-                    </div>
-
-                    {error && (
-                        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
-                            {error}
-                        </div>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="btn-primary disabled:opacity-50"
-                    >
-                        {loading ? 'Sending...' : 'Send Recovery Link'}
-                    </button>
-                </form>
-
-                <p className="text-center mt-6 text-ink/40 text-sm">
-                    Don&apos;t have a page?{' '}
-                    <Link href="/create" className="text-ink hover:underline">
-                        Create one
-                    </Link>
-                </p>
-            </div>
-        </main>
+        </>
     );
 }
