@@ -1,541 +1,299 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { countries, Country } from '@/lib/countries';
-import { formatE164 } from '@/lib/utils';
-import QRCode from 'qrcode';
+import { useParams } from 'next/navigation';
+import { Logo } from '@/components/Brand';
+import CopyButton from '@/components/CopyButton';
+import PhoneFrame from '@/components/PhoneFrame';
+import ProfileCard from '@/components/ProfileCard';
+import QRPanel from '@/components/QRPanel';
+import { ArrowRightIcon, CheckIcon, EyeIcon, LockIcon } from '@/components/icons';
+import {
+    EmailField,
+    LogoUpload,
+    SetField,
+    SocialFields,
+    TextField,
+    ThemePicker,
+    WhatsAppField,
+    WhatsAppMessageField,
+    useOrigin,
+} from '@/components/form/fields';
+import { formToCard, LIMITS, ProfileFormValues } from '@/lib/profile';
 
-interface Profile {
-    id: string;
-    slug: string;
-    business_name: string;
-    tagline: string | null;
-    whatsapp_e164: string;
-    phone: string | null;
-    email: string | null;
-    logo_url: string | null;
-    instagram_url: string | null;
-    twitter_url: string | null;
-    tiktok_url: string | null;
-    facebook_url: string | null;
-    linkedin_url: string | null;
-    website_url: string | null;
-    address: string | null;
+type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready' };
+
+function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+    return (
+        <section className="card space-y-5">
+            <div>
+                <h2 className="text-xl font-bold">{title}</h2>
+                {description && <p className="mt-1 text-sm text-muted">{description}</p>}
+            </div>
+            {children}
+        </section>
+    );
 }
 
 export default function EditPage() {
-    const params = useParams();
-    const token = params.token as string;
+    const { token } = useParams<{ token: string }>();
+    const origin = useOrigin();
 
-    const [profile, setProfile] = useState<Profile | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [load, setLoad] = useState<LoadState>({ status: 'loading' });
+    const [values, setValues] = useState<ProfileFormValues | null>(null);
+    const [saved, setSaved] = useState<ProfileFormValues | null>(null);
+    const [views, setViews] = useState(0);
     const [saving, setSaving] = useState(false);
-    const [saved, setSaved] = useState(false);
-
-    // Form state
-    const [businessName, setBusinessName] = useState('');
-    const [tagline, setTagline] = useState('');
-    const [whatsappNumber, setWhatsappNumber] = useState('');
-    const [phone, setPhone] = useState('');
-    const [email, setEmail] = useState('');
-    const [logoUrl, setLogoUrl] = useState('');
-    const [isUploading, setIsUploading] = useState(false);
-    const [instagram, setInstagram] = useState('');
-    const [twitter, setTwitter] = useState('');
-    const [tiktok, setTiktok] = useState('');
-    const [facebook, setFacebook] = useState('');
-    const [linkedin, setLinkedin] = useState('');
-    const [website, setWebsite] = useState('');
-    const [address, setAddress] = useState('');
-    const [selectedCountry, setSelectedCountry] = useState<Country>(countries[0]);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [publicUrl, setPublicUrl] = useState('');
-
-    // Extract handle from URL
-    const extractHandle = (url: string | null, platform: string) => {
-        if (!url) return '';
-        const patterns: Record<string, RegExp> = {
-            instagram: /instagram\.com\/([^\/\?]+)/,
-            twitter: /(?:twitter|x)\.com\/([^\/\?]+)/,
-            tiktok: /tiktok\.com\/@?([^\/\?]+)/,
-            facebook: /facebook\.com\/([^\/\?]+)/,
-            linkedin: /linkedin\.com\/(?:in|company)\/([^\/\?]+)/,
-        };
-        const match = url.match(patterns[platform]);
-        return match ? match[1] : '';
-    };
-
-    const extractDomain = (url: string | null) => {
-        if (!url) return '';
-        return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    };
+    const [justSaved, setJustSaved] = useState(false);
+    const [error, setError] = useState('');
+    const [showPreview, setShowPreview] = useState(false);
 
     useEffect(() => {
-        async function fetchProfile() {
+        let cancelled = false;
+        (async () => {
             try {
-                const res = await fetch(`/api/profiles/${token}`);
+                const res = await fetch(`/api/profiles/${token}`, { cache: 'no-store' });
                 const data = await res.json();
-
+                if (cancelled) return;
                 if (!res.ok) {
-                    setError(data.error || 'Unable to load your page. Please check your link.');
-                    setLoading(false);
+                    setLoad({ status: 'error', message: data.error || 'This edit link may be expired or incorrect.' });
                     return;
                 }
-
-                const p = data.profile as Profile;
-                setProfile(p);
-
-                setBusinessName(p.business_name);
-                setTagline(p.tagline || '');
-                setPhone(p.phone || '');
-                setEmail(p.email || '');
-                setLogoUrl(p.logo_url || '');
-                setInstagram(extractHandle(p.instagram_url, 'instagram'));
-                setTwitter(extractHandle(p.twitter_url, 'twitter'));
-                setTiktok(extractHandle(p.tiktok_url, 'tiktok'));
-                setFacebook(extractHandle(p.facebook_url, 'facebook'));
-                setLinkedin(extractHandle(p.linkedin_url, 'linkedin'));
-                setWebsite(extractDomain(p.website_url));
-                setAddress(p.address || '');
-
-                if (p.whatsapp_e164) {
-                    const country = countries.find((c) =>
-                        p.whatsapp_e164.startsWith(c.dialCode.replace('+', ''))
-                    );
-                    if (country) {
-                        setSelectedCountry(country);
-                        const localNumber = p.whatsapp_e164.replace(country.dialCode.replace('+', ''), '');
-                        setWhatsappNumber(localNumber);
-                    } else {
-                        setWhatsappNumber(p.whatsapp_e164);
-                    }
-                }
-
-                setLoading(false);
+                setValues(data.values);
+                setSaved(data.values);
+                setViews(data.views || 0);
+                setLoad({ status: 'ready' });
             } catch {
-                setError('Unable to connect. Please check your internet and try again.');
-                setLoading(false);
+                if (!cancelled) setLoad({ status: 'error', message: 'Couldn’t connect. Check your internet and try again.' });
             }
-        }
-
-        if (token) fetchProfile();
+        })();
+        return () => {
+            cancelled = true;
+        };
     }, [token]);
 
-    // Generate QR code when profile loads
-    useEffect(() => {
-        if (profile && canvasRef.current && typeof window !== 'undefined') {
-            const url = `${window.location.origin}/u/${profile.slug}`;
-            setPublicUrl(url);
-            QRCode.toCanvas(canvasRef.current, url, {
-                width: 200,
-                margin: 2,
-                color: {
-                    dark: '#1A1A1A',
-                    light: '#FAF9F6',
-                },
-            });
-        }
-    }, [profile]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSaving(true);
-        setSaved(false);
+    const set: SetField = useCallback((key, value) => {
+        setValues((prev) => (prev ? { ...prev, [key]: value } : prev));
         setError('');
+        setJustSaved(false);
+    }, []);
 
+    const dirty = useMemo(() => JSON.stringify(values) !== JSON.stringify(saved), [values, saved]);
+    const card = useMemo(() => (values ? formToCard(values) : null), [values]);
+
+    // Warn before leaving with unsaved changes
+    useEffect(() => {
+        if (!dirty) return;
+        const handler = (e: BeforeUnloadEvent) => {
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [dirty]);
+
+    const save = async () => {
+        if (!values) return;
+        setSaving(true);
+        setError('');
         try {
-            const whatsappE164 = formatE164(selectedCountry.dialCode, whatsappNumber);
-
             const res = await fetch(`/api/profiles/${token}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    business_name: businessName,
-                    tagline: tagline || null,
-                    whatsapp_e164: whatsappE164,
-                    phone: phone || null,
-                    email: email || null,
-                    logo_url: logoUrl || null,
-                    instagram: instagram || null,
-                    twitter: twitter || null,
-                    tiktok: tiktok || null,
-                    facebook: facebook || null,
-                    linkedin: linkedin || null,
-                    website: website || null,
-                    address: address || null,
-                }),
+                body: JSON.stringify(values),
             });
-
             const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || "Couldn't save changes. Please try again.");
-            }
-
-            setSaved(true);
-            setTimeout(() => setSaved(false), 3000);
+            if (!res.ok) throw new Error(data.error || 'Couldn’t save changes. Please try again.');
+            setSaved(values);
+            setJustSaved(true);
+            setTimeout(() => setJustSaved(false), 2500);
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Couldn't save changes. Please try again.");
+            setError(err instanceof Error ? err.message : 'Couldn’t save changes. Please try again.');
         }
-
         setSaving(false);
     };
 
-    if (loading) {
-        return (
-            <main className="min-h-screen flex items-center justify-center px-4">
-                <div className="text-ink/60">Loading your page...</div>
-            </main>
-        );
+    if (load.status === 'loading') {
+        return <main className="flex min-h-screen items-center justify-center text-muted">Loading your page…</main>;
     }
 
-    if (!profile) {
+    if (load.status === 'error' || !values || !card) {
         return (
-            <main className="min-h-screen py-8 px-4 md:py-16">
-                <div className="max-w-md mx-auto">
-                    <div className="card text-center">
-                        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                            </svg>
-                        </div>
-                        <h1 className="text-xl font-mono font-semibold mb-2">Link Not Working</h1>
-                        <p className="text-ink/60 text-sm mb-6">
-                            {error || 'This edit link may be expired or incorrect.'}
-                        </p>
-                        <div className="space-y-3">
-                            <Link href="/recover" className="btn-primary block">
-                                Recover Your Edit Link
-                            </Link>
-                            <Link href="/create" className="block py-3 text-ink/50 hover:text-ink/70 text-sm">
-                                Create a New Page
-                            </Link>
-                        </div>
+            <main className="flex min-h-screen items-center justify-center px-4">
+                <div className="card w-full max-w-md text-center">
+                    <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full border-2 border-ink bg-accent">
+                        <LockIcon className="h-6 w-6" />
+                    </div>
+                    <h1 className="text-2xl font-bold">This link isn’t working</h1>
+                    <p className="mt-2 text-sm text-muted">{load.status === 'error' ? load.message : ''}</p>
+                    <div className="mt-6 space-y-3">
+                        <Link href="/recover" className="btn-primary w-full">
+                            Get a new edit link
+                        </Link>
+                        <Link href="/" className="btn-ghost w-full text-sm">
+                            Go home
+                        </Link>
                     </div>
                 </div>
             </main>
         );
     }
 
+    const publicUrl = origin ? `${origin}/u/${values.slug}` : '';
+
     return (
-        <main className="min-h-screen py-6 px-4 md:py-12">
-            <div className="max-w-lg mx-auto">
-                {/* Header */}
-                <div className="text-center mb-6 md:mb-8">
-                    <h1 className="text-2xl md:text-3xl font-mono font-semibold text-ink mb-2">
-                        Edit Your Page
-                    </h1>
-                    <Link
-                        href={`/u/${profile.slug}`}
-                        className="text-ink/60 hover:text-ink text-sm"
-                        target="_blank"
-                    >
-                        View live page →
-                    </Link>
+        <div className="min-h-screen pb-28">
+            <header className="sticky top-0 z-30 border-b-2 border-ink bg-paper">
+                <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+                    <Logo />
+                    <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => setShowPreview(true)} className="btn-secondary px-3 py-1.5 text-sm lg:hidden">
+                            <EyeIcon className="h-4 w-4" /> Preview
+                        </button>
+                        <a href={`/u/${values.slug}`} target="_blank" rel="noopener noreferrer" className="btn-ghost hidden px-3 py-2 text-sm sm:inline-flex">
+                            View live page <ArrowRightIcon className="h-4 w-4" />
+                        </a>
+                    </div>
+                </div>
+            </header>
+
+            <main className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_380px]">
+                <div className="min-w-0 space-y-6">
+                    <div>
+                        <p className="eyebrow">Editing</p>
+                        <h1 className="mt-1 break-words text-3xl font-bold sm:text-4xl">{saved?.businessName}</h1>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            <span className="chip">
+                                <EyeIcon className="h-3.5 w-3.5" /> {views.toLocaleString()} {views === 1 ? 'visit' : 'visits'}
+                            </span>
+                            {publicUrl && (
+                                <span className="chip max-w-full">
+                                    <span className="truncate font-mono">{publicUrl.replace(/^https?:\/\//, '')}</span>
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    <Section title="Basics">
+                        <TextField
+                            id="businessName"
+                            label="Business name"
+                            value={values.businessName}
+                            onChange={(v) => set('businessName', v)}
+                            maxLength={LIMITS.businessName}
+                            required
+                        />
+                        <TextField
+                            id="tagline"
+                            label="What do you do?"
+                            value={values.tagline}
+                            onChange={(v) => set('tagline', v)}
+                            maxLength={LIMITS.tagline}
+                            placeholder="Home-cooked meals, delivered in Lekki"
+                        />
+                        <LogoUpload values={values} set={set} />
+                    </Section>
+
+                    <Section title="Look" description="Pick the theme for your public page.">
+                        <ThemePicker values={values} set={set} />
+                    </Section>
+
+                    <Section title="Contact">
+                        <WhatsAppField values={values} set={set} />
+                        {values.whatsappNumber && <WhatsAppMessageField values={values} set={set} />}
+                        <TextField
+                            id="phone"
+                            type="tel"
+                            label="Phone for calls"
+                            value={values.phone}
+                            onChange={(v) => set('phone', v)}
+                            inputMode="tel"
+                            placeholder="+234 801 234 5678"
+                        />
+                        <EmailField values={values} set={set} />
+                    </Section>
+
+                    <Section title="Socials & website">
+                        <SocialFields values={values} set={set} />
+                    </Section>
+
+                    <Section title="Location">
+                        <TextField
+                            id="address"
+                            label="Address"
+                            value={values.address}
+                            onChange={(v) => set('address', v)}
+                            maxLength={LIMITS.address}
+                            placeholder="12 Admiralty Way, Lekki, Lagos"
+                            hint="Adds a Directions button."
+                        />
+                    </Section>
+
+                    <Section title="Your QR code" description="It always points to your page, so edits never mean reprinting.">
+                        {publicUrl && <QRPanel url={publicUrl} slug={values.slug} businessName={saved?.businessName || values.businessName} compact />}
+                    </Section>
+
+                    <section className="rounded-2xl border-2 border-dashed border-line p-5 text-sm text-muted">
+                        <p className="font-semibold text-ink">Keep this page’s address private</p>
+                        <p className="mt-1">Anyone with this edit link can change your page. Bookmark it, or request a new one from the Recover page.</p>
+                        <div className="mt-3">
+                            <CopyButton text={typeof window !== 'undefined' ? window.location.href : ''} label="Copy edit link" />
+                        </div>
+                    </section>
                 </div>
 
-                {/* QR Code Section */}
-                <div className="card mb-6">
-                    <h2 className="font-medium text-ink text-sm uppercase tracking-wide mb-4">Your QR Code</h2>
-                    <div className="flex flex-col items-center gap-4">
-                        <canvas ref={canvasRef} className="rounded-xl border border-border" />
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (canvasRef.current) {
-                                    const link = document.createElement('a');
-                                    link.download = `${profile.slug}-qr-code.png`;
-                                    link.href = canvasRef.current.toDataURL('image/png');
-                                    link.click();
-                                }
-                            }}
-                            className="w-full py-3 px-6 rounded-xl bg-ink text-milk font-medium transition-all hover:bg-ink/90 flex items-center justify-center gap-2"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                            </svg>
-                            Download QR Code
+                <aside className="hidden lg:block">
+                    <div className="sticky top-24">
+                        <p className="eyebrow mb-4 text-center">Live preview</p>
+                        <PhoneFrame themeId={values.theme}>
+                            <ProfileCard card={card} preview />
+                        </PhoneFrame>
+                    </div>
+                </aside>
+            </main>
+
+            {/* Save bar */}
+            <div className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-white">
+                <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+                    <p className="min-w-0 truncate text-sm" role="status">
+                        {error ? (
+                            <span className="font-medium text-[#D23A3A]">{error}</span>
+                        ) : justSaved ? (
+                            <span className="inline-flex items-center gap-1.5 font-medium text-[#1E6B40]">
+                                <CheckIcon className="h-4 w-4" /> Saved. Your page is updated.
+                            </span>
+                        ) : dirty ? (
+                            <span className="font-medium">You have unsaved changes</span>
+                        ) : (
+                            <span className="text-muted">All changes saved</span>
+                        )}
+                    </p>
+                    <div className="flex shrink-0 gap-2">
+                        {dirty && (
+                            <button type="button" onClick={() => saved && setValues(saved)} className="btn-ghost px-3 py-2 text-sm">
+                                Discard
+                            </button>
+                        )}
+                        <button type="button" onClick={save} disabled={saving || !dirty} className="btn-primary px-6 py-2.5">
+                            {saving ? 'Saving…' : 'Save changes'}
                         </button>
                     </div>
                 </div>
+            </div>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Basic Info */}
-                    <div className="card space-y-4">
-                        <h2 className="font-medium text-ink text-sm uppercase tracking-wide">Basic Info</h2>
-
-                        <div>
-                            <label htmlFor="businessName" className="label">
-                                Business Name <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                id="businessName"
-                                type="text"
-                                value={businessName}
-                                onChange={(e) => setBusinessName(e.target.value)}
-                                className="input-field"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="tagline" className="label">Tagline</label>
-                            <input
-                                id="tagline"
-                                type="text"
-                                value={tagline}
-                                onChange={(e) => setTagline(e.target.value)}
-                                className="input-field"
-                                maxLength={60}
-                                placeholder="What do you do?"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="logoUrl" className="label">Logo (optional)</label>
-                            {logoUrl ? (
-                                <div className="relative w-24 h-24 mb-4 border border-border rounded-xl overflow-hidden group bg-white shadow-sm">
-                                    <img src={logoUrl} alt="Logo preview" className="w-full h-full object-cover" />
-                                    <button
-                                        type="button"
-                                        onClick={() => setLogoUrl('')}
-                                        className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity font-medium text-xs"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="relative max-w-xs">
-                                    <input
-                                        type="file"
-                                        accept="image/png, image/jpeg, image/jpg, image/webp"
-                                        onChange={async (e) => {
-                                            const file = e.target.files?.[0];
-                                            if (!file) return;
-
-                                            setIsUploading(true);
-                                            const formData = new FormData();
-                                            formData.append('file', file);
-
-                                            try {
-                                                const res = await fetch('/api/upload', {
-                                                    method: 'POST',
-                                                    body: formData
-                                                });
-                                                const data = await res.json();
-                                                if (data.url) {
-                                                    setLogoUrl(data.url);
-                                                } else {
-                                                    setError('Upload failed: ' + (data.error || 'Unknown error'));
-                                                }
-                                            } catch (error) {
-                                                console.error('Upload error:', error);
-                                                setError('Upload failed');
-                                            }
-                                            setIsUploading(false);
-                                        }}
-                                        className="hidden"
-                                        id="logo-upload-edit"
-                                        disabled={isUploading}
-                                    />
-                                    <label
-                                        htmlFor="logo-upload-edit"
-                                        className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-border rounded-xl cursor-pointer hover:bg-ink/5 transition-colors ${isUploading ? 'opacity-50 cursor-wait' : ''}`}
-                                    >
-                                        {isUploading ? (
-                                            <span className="text-xs font-medium text-ink/60 animate-pulse">Uploading...</span>
-                                        ) : (
-                                            <>
-                                                <svg className="w-6 h-6 text-ink/40 mb-1" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                                                </svg>
-                                                <span className="text-xs font-medium text-ink/60">Upload Logo</span>
-                                            </>
-                                        )}
-                                    </label>
-                                </div>
-                            )}
-                            <p className="text-xs text-ink/50 mt-1">Square image works best (e.g. 200x200px)</p>
-                        </div>
+            {showPreview && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/60 p-4 sm:items-center lg:hidden" onClick={() => setShowPreview(false)}>
+                    <div className="w-full max-w-sm animate-fade-up" onClick={(e) => e.stopPropagation()}>
+                        <PhoneFrame themeId={values.theme} className="max-w-[320px]">
+                            <ProfileCard card={card} preview />
+                        </PhoneFrame>
+                        <button type="button" onClick={() => setShowPreview(false)} className="btn-secondary mx-auto mt-4 flex w-full max-w-[320px]">
+                            Close preview
+                        </button>
                     </div>
-
-                    {/* Contact */}
-                    <div className="card space-y-4">
-                        <h2 className="font-medium text-ink text-sm uppercase tracking-wide">Contact</h2>
-
-                        <div>
-                            <label htmlFor="email" className="label">Email</label>
-                            <input
-                                id="email"
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="input-field"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="whatsapp" className="label">
-                                WhatsApp <span className="text-red-500">*</span>
-                            </label>
-                            <div className="flex gap-2">
-                                <select
-                                    value={selectedCountry.code}
-                                    onChange={(e) => {
-                                        const country = countries.find((c) => c.code === e.target.value);
-                                        if (country) setSelectedCountry(country);
-                                    }}
-                                    className="input-field w-24 md:w-28 flex-shrink-0 text-sm"
-                                    aria-label="Country"
-                                >
-                                    {countries.map((country) => (
-                                        <option key={country.code} value={country.code}>
-                                            {country.flag} {country.dialCode}
-                                        </option>
-                                    ))}
-                                </select>
-                                <input
-                                    id="whatsapp"
-                                    type="tel"
-                                    value={whatsappNumber}
-                                    onChange={(e) => setWhatsappNumber(e.target.value)}
-                                    className="input-field flex-1"
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label htmlFor="phone" className="label">Phone (optional)</label>
-                            <input
-                                id="phone"
-                                type="tel"
-                                value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
-                                className="input-field"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Social Links */}
-                    <div className="card space-y-4">
-                        <h2 className="font-medium text-ink text-sm uppercase tracking-wide">Social Links</h2>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label htmlFor="instagram" className="label text-xs">Instagram</label>
-                                <input
-                                    id="instagram"
-                                    type="text"
-                                    value={instagram}
-                                    onChange={(e) => setInstagram(e.target.value.replace(/[^a-zA-Z0-9._]/g, ''))}
-                                    placeholder="@handle"
-                                    className="input-field text-sm"
-                                />
-                            </div>
-                            <div>
-                                <label htmlFor="twitter" className="label text-xs">Twitter / X</label>
-                                <input
-                                    id="twitter"
-                                    type="text"
-                                    value={twitter}
-                                    onChange={(e) => setTwitter(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-                                    placeholder="@handle"
-                                    className="input-field text-sm"
-                                />
-                            </div>
-                            <div>
-                                <label htmlFor="tiktok" className="label text-xs">TikTok</label>
-                                <input
-                                    id="tiktok"
-                                    type="text"
-                                    value={tiktok}
-                                    onChange={(e) => setTiktok(e.target.value.replace(/[^a-zA-Z0-9._]/g, ''))}
-                                    placeholder="@handle"
-                                    className="input-field text-sm"
-                                />
-                            </div>
-                            <div>
-                                <label htmlFor="facebook" className="label text-xs">Facebook</label>
-                                <input
-                                    id="facebook"
-                                    type="text"
-                                    value={facebook}
-                                    onChange={(e) => setFacebook(e.target.value.replace(/[^a-zA-Z0-9.]/g, ''))}
-                                    placeholder="pagename"
-                                    className="input-field text-sm"
-                                />
-                            </div>
-                            <div>
-                                <label htmlFor="linkedin" className="label text-xs">LinkedIn</label>
-                                <input
-                                    id="linkedin"
-                                    type="text"
-                                    value={linkedin}
-                                    onChange={(e) => setLinkedin(e.target.value.replace(/[^a-zA-Z0-9-]/g, ''))}
-                                    placeholder="yourname or company/name"
-                                    className="input-field text-sm"
-                                />
-                            </div>
-                            <div>
-                                <label htmlFor="website" className="label text-xs">Website</label>
-                                <input
-                                    id="website"
-                                    type="text"
-                                    value={website}
-                                    onChange={(e) => setWebsite(e.target.value)}
-                                    placeholder="www.yourbusiness.com"
-                                    className="input-field text-sm"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Location */}
-                    <div className="card space-y-4">
-                        <h2 className="font-medium text-ink text-sm uppercase tracking-wide">Location</h2>
-                        <div>
-                            <label htmlFor="address" className="label">Address</label>
-                            <input
-                                id="address"
-                                type="text"
-                                value={address}
-                                onChange={(e) => setAddress(e.target.value)}
-                                className="input-field"
-                                placeholder="123 Main Street, City"
-                            />
-                            <p className="text-xs text-ink/50 mt-1">Adds a "Get Directions" button</p>
-                        </div>
-                    </div>
-
-                    {/* Messages */}
-                    {error && (
-                        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
-                            {error}
-                        </div>
-                    )}
-                    {saved && (
-                        <div className="p-4 rounded-xl bg-green-50 border border-green-200 text-green-600 text-sm flex items-center gap-2">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Changes saved!
-                        </div>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={saving}
-                        className="btn-primary w-full disabled:opacity-50"
-                    >
-                        {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
-                </form>
-            </div >
-        </main >
+                </div>
+            )}
+        </div>
     );
 }

@@ -1,51 +1,28 @@
+import 'server-only';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+let client: SupabaseClient | null = null;
 
-let _supabase: SupabaseClient | null = null;
-
-export function getSupabase(): SupabaseClient {
-    if (!_supabase) {
-        if (!supabaseUrl || !supabaseAnonKey) {
-            throw new Error('Supabase environment variables are not configured');
-        }
-        _supabase = createClient(supabaseUrl, supabaseAnonKey);
+export class DatabaseNotConfiguredError extends Error {
+    constructor() {
+        super('Supabase environment variables are not configured');
     }
-    return _supabase;
 }
 
-export const supabase = {
-    from: (table: string) => getSupabase().from(table),
-};
-
+/**
+ * Server-only Supabase client using the service role key.
+ * Row Level Security has no public policies, so every read and write
+ * goes through here and selects explicit columns.
+ */
 export function getServiceClient(): SupabaseClient {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceRoleKey) {
-        throw new Error('Supabase environment variables are not configured');
-    }
-    return createClient(supabaseUrl, serviceRoleKey);
-}
+    if (client) return client;
 
-export interface Profile {
-    id: string;
-    slug: string;
-    business_name: string;
-    tagline: string | null;
-    email: string;
-    whatsapp_e164: string;
-    phone: string | null;
-    logo_url: string | null;
-    instagram_url: string | null;
-    twitter_url: string | null;
-    tiktok_url: string | null;
-    facebook_url: string | null;
-    linkedin_url: string | null;
-    youtube_url: string | null;
-    website_url: string | null;
-    address: string | null;
-    edit_token_hash: string;
-    created_at: string;
-    updated_at: string;
-    views: number;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !serviceRoleKey) throw new DatabaseNotConfiguredError();
+
+    client = createClient(url, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+    });
+    return client;
 }

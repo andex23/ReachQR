@@ -1,22 +1,25 @@
 import Link from 'next/link';
+import { SiteHeader } from '@/components/Brand';
 
 export default function NotFound() {
     return (
-        <main className="min-h-screen flex items-center justify-center py-8 px-4">
-            <div className="card text-center max-w-md">
-                <div className="w-16 h-16 bg-ink/5 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <span className="text-3xl">🔍</span>
+        <>
+            <SiteHeader />
+            <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12">
+                <div className="card w-full max-w-md text-center">
+                    <p className="font-display text-7xl font-extrabold">404</p>
+                    <h1 className="mt-4 text-2xl font-bold">This page doesn’t exist</h1>
+                    <p className="mt-2 text-muted">The link may be mistyped, or the page was removed.</p>
+                    <div className="mt-6 flex flex-col gap-3">
+                        <Link href="/create" className="btn-accent w-full">
+                            Create your own page
+                        </Link>
+                        <Link href="/" className="btn-ghost w-full text-sm">
+                            Go home
+                        </Link>
+                    </div>
                 </div>
-                <h1 className="text-2xl font-mono font-semibold text-ink mb-2">
-                    Page Not Found
-                </h1>
-                <p className="text-ink/60 mb-6">
-                    The page you&apos;re looking for doesn&apos;t exist or may have been removed.
-                </p>
-                <Link href="/create" className="btn-primary inline-block">
-                    Create Your Own Page
-                </Link>
-            </div>
-        </main>
+            </main>
+        </>
     );
 }

@@ -1,385 +1,323 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Logo } from '@/components/Brand';
+import { EmailIcon, EyeIcon } from '@/components/icons';
+import { getTheme } from '@/lib/themes';
 
-interface Profile {
+interface AdminProfile {
     id: string;
-    business_name: string;
     slug: string;
+    business_name: string;
     email: string;
-    whatsapp_e164: string;
-    created_at: string;
-    edit_token_hash: string;
+    whatsapp_e164: string | null;
     logo_url: string | null;
-    views: number;
+    theme: string | null;
+    views: number | null;
+    created_at: string;
+}
+
+type Sort = 'newest' | 'views';
+
+const DAY = 24 * 60 * 60 * 1000;
+
+function Stat({ label, value }: { label: string; value: number | string }) {
+    return (
+        <div className="rounded-2xl border-2 border-ink bg-white p-5">
+            <p className="eyebrow">{label}</p>
+            <p className="mt-2 font-display text-4xl font-bold">{value}</p>
+        </div>
+    );
 }
 
 export default function AdminPage() {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [auth, setAuth] = useState<'checking' | 'out' | 'in'>('checking');
     const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [profiles, setProfiles] = useState<Profile[]>([]);
-    const [error, setError] = useState('');
+    const [loginError, setLoginError] = useState('');
+    const [loggingIn, setLoggingIn] = useState(false);
 
-    const [searchQuery, setSearchQuery] = useState('');
-    const [sendingEmails, setSendingEmails] = useState(false);
-    const [emailResult, setEmailResult] = useState<{ sent: number; failed: number } | null>(null);
+    const [profiles, setProfiles] = useState<AdminProfile[]>([]);
+    const [query, setQuery] = useState('');
+    const [sort, setSort] = useState<Sort>('newest');
+    const [busy, setBusy] = useState<string | null>(null);
+    const [notice, setNotice] = useState('');
 
-    // Check session on mount
-    useEffect(() => {
-        const stored = localStorage.getItem('reach_admin_key');
-        if (stored) {
-            fetchProfiles(stored);
+    const loadProfiles = useCallback(async () => {
+        const res = await fetch('/api/admin/profiles', { cache: 'no-store' });
+        if (res.status === 401) {
+            setAuth('out');
+            return;
         }
+        const data = await res.json();
+        setProfiles(data.profiles || []);
+        setAuth('in');
     }, []);
 
-    const fetchProfiles = async (pwd: string) => {
-        setLoading(true);
-        setError('');
-        try {
-            const res = await fetch('/api/admin/profiles', {
-                headers: { 'x-admin-password': pwd },
-            });
+    useEffect(() => {
+        fetch('/api/admin/session', { cache: 'no-store' })
+            .then((r) => r.json())
+            .then((d) => (d.authenticated ? loadProfiles() : setAuth('out')))
+            .catch(() => setAuth('out'));
+    }, [loadProfiles]);
 
-            if (res.ok) {
-                const data = await res.json();
-                setProfiles(data.profiles);
-                setIsAuthenticated(true);
-                localStorage.setItem('reach_admin_key', pwd);
-            } else {
-                setError('Invalid password');
-                localStorage.removeItem('reach_admin_key');
-                setIsAuthenticated(false);
-            }
-        } catch {
-            setError('Failed to load data');
-        }
-        setLoading(false);
-    };
-
-    const handleLogin = (e: React.FormEvent) => {
+    const login = async (e: React.FormEvent) => {
         e.preventDefault();
-        fetchProfiles(password);
+        setLoggingIn(true);
+        setLoginError('');
+        const res = await fetch('/api/admin/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+        });
+        if (res.ok) {
+            setPassword('');
+            await loadProfiles();
+        } else {
+            const data = await res.json().catch(() => ({}));
+            setLoginError(data.error || 'Invalid password');
+        }
+        setLoggingIn(false);
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem('reach_admin_key');
-        setIsAuthenticated(false);
+    const logout = async () => {
+        await fetch('/api/admin/session', { method: 'DELETE' });
         setProfiles([]);
-        setPassword('');
+        setAuth('out');
     };
 
-    const handleDelete = async (id: string, name: string) => {
-        if (!confirm(`Are you sure you want to delete "${name}"? This cannot be undone.`)) return;
-
-        const pwd = localStorage.getItem('reach_admin_key');
-        if (!pwd) return;
-
-        try {
-            const res = await fetch('/api/admin/profiles', {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-admin-password': pwd
-                },
-                body: JSON.stringify({ id })
-            });
-
-            if (res.ok) {
-                setProfiles(prev => prev.filter(p => p.id !== id));
-            } else {
-                alert('Failed to delete profile');
-            }
-        } catch (err) {
-            alert('Error deleting profile');
-        }
+    const flash = (msg: string) => {
+        setNotice(msg);
+        setTimeout(() => setNotice(''), 4000);
     };
 
-    // Analytics Calculation
-    const totalProfiles = profiles.length;
-    const profilesToday = profiles.filter(p =>
-        new Date(p.created_at).toDateString() === new Date().toDateString()
-    ).length;
-    const profilesWeek = profiles.filter(p => {
-        const date = new Date(p.created_at);
-        const now = new Date();
-        const diffTime = Math.abs(now.getTime() - date.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays <= 7;
-    }).length;
-
-    const handleSendEmails = async () => {
-        if (!confirm(`Send notification emails to ALL ${profiles.length} users? This cannot be undone.`)) return;
-
-        const pwd = localStorage.getItem('reach_admin_key');
-        if (!pwd) return;
-
-        setSendingEmails(true);
-        setEmailResult(null);
-
-        try {
-            const res = await fetch('/api/admin/notify-all', {
-                method: 'POST',
-                headers: { 'x-admin-password': pwd }
-            });
-
-            const data = await res.json();
-
-            if (res.ok) {
-                setEmailResult({ sent: data.sent, failed: data.failed });
-                alert(`Emails sent! ✅ ${data.sent} sent, ${data.failed} failed`);
-            } else {
-                alert('Failed to send emails');
-            }
-        } catch (err) {
-            alert('Error sending emails');
-        }
-
-        setSendingEmails(false);
+    const remove = async (p: AdminProfile) => {
+        if (!confirm(`Delete “${p.business_name}”? This can’t be undone and its QR code will stop working.`)) return;
+        setBusy(p.id);
+        const res = await fetch('/api/admin/profiles', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: p.id }),
+        });
+        if (res.ok) {
+            setProfiles((prev) => prev.filter((x) => x.id !== p.id));
+            flash(`Deleted ${p.business_name}`);
+        } else flash('Delete failed');
+        setBusy(null);
     };
 
-    if (!isAuthenticated) {
+    const sendLink = async (p: AdminProfile) => {
+        setBusy(p.id);
+        const res = await fetch(`/api/admin/profiles/${p.id}/recovery`, { method: 'POST' });
+        flash(res.ok ? `Recovery link sent to ${p.email}` : 'Failed to send recovery link');
+        setBusy(null);
+    };
+
+    const emailAll = async () => {
+        if (!confirm(`Send the announcement email to all ${profiles.length} page owners?`)) return;
+        setBusy('all');
+        const res = await fetch('/api/admin/notify-all', { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        flash(res.ok ? `Emails: ${data.sent} sent, ${data.failed} failed` : 'Failed to send emails');
+        setBusy(null);
+    };
+
+    const stats = useMemo(() => {
+        const now = Date.now();
+        const startOfToday = new Date().setHours(0, 0, 0, 0);
+        const days = Array.from({ length: 14 }, (_, i) => {
+            const start = startOfToday - (13 - i) * DAY;
+            return {
+                label: new Date(start).toLocaleDateString('en', { weekday: 'narrow' }),
+                date: new Date(start).toLocaleDateString(),
+                count: profiles.filter((p) => {
+                    const t = new Date(p.created_at).getTime();
+                    return t >= start && t < start + DAY;
+                }).length,
+            };
+        });
+        return {
+            total: profiles.length,
+            today: profiles.filter((p) => new Date(p.created_at).getTime() >= startOfToday).length,
+            week: profiles.filter((p) => now - new Date(p.created_at).getTime() <= 7 * DAY).length,
+            views: profiles.reduce((sum, p) => sum + (p.views || 0), 0),
+            days,
+            max: Math.max(1, ...days.map((d) => d.count)),
+        };
+    }, [profiles]);
+
+    const visible = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        const list = q
+            ? profiles.filter((p) => [p.business_name, p.email, p.slug, p.whatsapp_e164 || ''].some((v) => v?.toLowerCase().includes(q)))
+            : profiles;
+        return sort === 'views' ? [...list].sort((a, b) => (b.views || 0) - (a.views || 0)) : list;
+    }, [profiles, query, sort]);
+
+    if (auth === 'checking') return <main className="flex min-h-screen items-center justify-center text-muted">Loading…</main>;
+
+    if (auth === 'out') {
         return (
-            <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-                <div className="w-full max-w-sm bg-white p-8 rounded-2xl shadow-sm border border-border">
-                    <h1 className="text-xl font-mono font-semibold text-center mb-6">Admin Access</h1>
-                    <form onSubmit={handleLogin} className="space-y-4">
+            <main className="flex min-h-screen items-center justify-center px-4">
+                <form onSubmit={login} className="card w-full max-w-sm space-y-5">
+                    <div className="flex items-center justify-between">
+                        <Logo />
+                        <span className="chip">Admin</span>
+                    </div>
+                    <div>
+                        <label htmlFor="password" className="label">
+                            Password
+                        </label>
                         <input
+                            id="password"
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Enter password..."
-                            className="input-field w-full"
+                            className="input"
+                            autoComplete="current-password"
                             autoFocus
                         />
-                        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="btn-primary w-full"
-                        >
-                            {loading ? 'Checking...' : 'Login'}
-                        </button>
-                    </form>
-                    <div className="mt-8 text-center text-xs text-ink/30 font-mono uppercase tracking-widest">
-                        © {new Date().getFullYear()} AVD Studios
                     </div>
-                </div>
+                    {loginError && <p className="text-sm font-medium text-[#D23A3A]">{loginError}</p>}
+                    <button type="submit" disabled={loggingIn || !password} className="btn-primary w-full">
+                        {loggingIn ? 'Checking…' : 'Sign in'}
+                    </button>
+                </form>
             </main>
         );
     }
 
-    const filteredProfiles = profiles.filter(p =>
-        p.business_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.slug.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    // ... (login view remains)
-
     return (
-        <main className="min-h-screen bg-gray-50 flex flex-col">
-            {/* Navbar */}
-            <nav className="bg-white border-b border-border px-4 md:px-8 h-16 flex items-center justify-between flex-shrink-0">
-                <div className="flex items-center gap-2">
-                    <Link href="/" className="font-mono font-semibold text-ink">
-                        Reach<span className="text-ink/40">QR</span>
-                    </Link>
-                    <span className="bg-ink/5 px-2 py-0.5 rounded text-xs font-mono text-ink/60">ADMIN</span>
-                </div>
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={handleSendEmails}
-                        disabled={sendingEmails || profiles.length === 0}
-                        className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                        {sendingEmails ? (
-                            <>
-                                <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                                Sending...
-                            </>
-                        ) : (
-                            <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                                </svg>
-                                Email All
-                            </>
-                        )}
-                    </button>
-                    <button
-                        onClick={handleLogout}
-                        className="text-sm text-ink/60 hover:text-ink hover:underline"
-                    >
-                        Logout
-                    </button>
-                </div>
-            </nav>
-
-            {/* Dashboard */}
-            <div className="max-w-6xl mx-auto py-8 px-4 md:px-8 flex-1 w-full">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                    <div>
-                        <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
-                        <p className="text-ink/50 text-sm mt-1">Manage your users and view stats</p>
+        <div className="min-h-screen">
+            <header className="sticky top-0 z-30 border-b-2 border-ink bg-paper">
+                <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+                    <div className="flex items-center gap-3">
+                        <Logo />
+                        <span className="chip">Admin</span>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <button type="button" onClick={emailAll} disabled={!!busy || profiles.length === 0} className="btn-secondary px-3 py-2 text-sm">
+                            <EmailIcon className="h-4 w-4" />
+                            {busy === 'all' ? 'Sending…' : 'Email all'}
+                        </button>
+                        <button type="button" onClick={logout} className="btn-ghost px-3 py-2 text-sm">
+                            Sign out
+                        </button>
+                    </div>
+                </div>
+            </header>
 
-                    <div className="flex items-center gap-4">
-                        {/* Search */}
-                        <div className="relative">
-                            <input
-                                type="text"
-                                placeholder="Search users..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 pr-4 py-2 rounded-lg border border-border text-sm w-full md:w-64 focus:outline-none focus:border-ink/30"
-                            />
-                            <svg className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                            </svg>
+            <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
+                {notice && (
+                    <p role="status" className="rounded-xl border-2 border-ink bg-accent px-4 py-3 text-sm font-semibold">
+                        {notice}
+                    </p>
+                )}
+
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                    <Stat label="Pages" value={stats.total} />
+                    <Stat label="Created today" value={stats.today} />
+                    <Stat label="Last 7 days" value={stats.week} />
+                    <Stat label="Total visits" value={stats.views.toLocaleString()} />
+                </div>
+
+                <div className="rounded-2xl border-2 border-ink bg-white p-5">
+                    <p className="eyebrow mb-4">New pages, last 14 days</p>
+                    <div className="flex h-36 items-end gap-1.5">
+                        {stats.days.map((d) => (
+                            <div key={d.date} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${d.date}: ${d.count}`}>
+                                <span className="text-[10px] font-semibold">{d.count || ''}</span>
+                                <div
+                                    className="w-full rounded-t-md border-2 border-b-0 border-ink bg-accent"
+                                    style={{ height: `${(d.count / stats.max) * 100}%`, minHeight: d.count ? 8 : 2 }}
+                                />
+                                <span className="text-[10px] text-muted">{d.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border-2 border-ink bg-white">
+                    <div className="flex flex-col gap-3 border-b-2 border-ink p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <input
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search name, email, link or number…"
+                            className="input py-2 sm:max-w-xs"
+                        />
+                        <div className="flex gap-1 rounded-xl border-2 border-ink p-1 text-sm">
+                            {(['newest', 'views'] as Sort[]).map((s) => (
+                                <button
+                                    key={s}
+                                    type="button"
+                                    onClick={() => setSort(s)}
+                                    className={`rounded-lg px-3 py-1 font-semibold ${sort === s ? 'bg-ink text-paper' : ''}`}
+                                >
+                                    {s === 'newest' ? 'Newest' : 'Most visited'}
+                                </button>
+                            ))}
                         </div>
                     </div>
-                </div>
 
-                {/* Analytics Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                    <div className="bg-white p-6 rounded-xl border border-border shadow-sm">
-                        <p className="text-sm font-medium text-ink/50 mb-1">Total Profiles</p>
-                        <p className="text-3xl font-semibold text-ink">{totalProfiles}</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-xl border border-border shadow-sm">
-                        <p className="text-sm font-medium text-ink/50 mb-1">Created Today</p>
-                        <p className="text-3xl font-semibold text-ink">{profilesToday}</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-xl border border-border shadow-sm">
-                        <p className="text-sm font-medium text-ink/50 mb-1">Last 7 Days</p>
-                        <p className="text-3xl font-semibold text-ink">{profilesWeek}</p>
-                    </div>
-                </div>
-
-                {/* Signups Chart - Last 7 Days */}
-                <div className="bg-white p-6 rounded-xl border border-border shadow-sm mb-8">
-                    <p className="text-sm font-medium text-ink/50 mb-4">Signups - Last 7 Days</p>
-                    <div className="flex items-end gap-2 h-32">
-                        {(() => {
-                            const days = [];
-                            for (let i = 6; i >= 0; i--) {
-                                const date = new Date();
-                                date.setDate(date.getDate() - i);
-                                const dateStr = date.toDateString();
-                                const count = profiles.filter(p =>
-                                    new Date(p.created_at).toDateString() === dateStr
-                                ).length;
-                                days.push({ date, count, label: date.toLocaleDateString('en', { weekday: 'short' }) });
-                            }
-                            const maxCount = Math.max(...days.map(d => d.count), 1);
-                            return days.map((day, idx) => (
-                                <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                                    <div
-                                        className="w-full bg-ink/80 rounded-t transition-all"
-                                        style={{ height: `${(day.count / maxCount) * 100}%`, minHeight: day.count > 0 ? '8px' : '2px' }}
-                                    />
-                                    <span className="text-[10px] text-ink/50">{day.label}</span>
-                                    <span className="text-xs font-medium text-ink">{day.count}</span>
-                                </div>
-                            ));
-                        })()}
-                    </div>
-                </div>
-
-                {/* Table */}
-                <div className="bg-white rounded-xl border border-border overflow-hidden shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50/50 border-b border-border text-xs uppercase text-ink/50 font-medium tracking-wide">
-                                    <th className="px-6 py-4">Business</th>
-                                    <th className="px-6 py-4">Contact</th>
-                                    <th className="px-6 py-4">👁️ Views</th>
-                                    <th className="px-6 py-4">Joined</th>
-                                    <th className="px-6 py-4 text-right">Action</th>
+                        <table className="w-full text-left text-sm">
+                            <thead className="border-b-2 border-ink bg-paper">
+                                <tr className="eyebrow">
+                                    <th className="px-4 py-3 font-medium">Business</th>
+                                    <th className="px-4 py-3 font-medium">Contact</th>
+                                    <th className="px-4 py-3 font-medium">Visits</th>
+                                    <th className="px-4 py-3 font-medium">Created</th>
+                                    <th className="px-4 py-3 text-right font-medium">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-border">
-                                {filteredProfiles.map((profile) => (
-                                    <tr key={profile.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-ink/5 flex items-center justify-center overflow-hidden flex-shrink-0 border border-border/50">
-                                                    {profile.logo_url ? (
-                                                        <img
-                                                            src={profile.logo_url}
-                                                            alt={profile.business_name}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <span className="font-mono text-sm font-semibold">{profile.business_name.charAt(0).toUpperCase()}</span>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium text-ink truncate max-w-[150px]">{profile.business_name}</p>
-                                                    <a
-                                                        href={`/u/${profile.slug}`}
-                                                        target="_blank"
-                                                        rel="noopener"
-                                                        className="text-xs text-blue-600 hover:underline"
+                            <tbody className="divide-y divide-line">
+                                {visible.map((p) => {
+                                    const theme = getTheme(p.theme);
+                                    return (
+                                        <tr key={p.id} className="hover:bg-paper/60">
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div
+                                                        className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-ink font-display font-bold"
+                                                        style={{ background: theme.accent, color: theme.accentText }}
                                                     >
-                                                        /{profile.slug}
-                                                    </a>
+                                                        {p.logo_url ? <img src={p.logo_url} alt="" className="h-full w-full object-cover" /> : p.business_name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="max-w-[200px] truncate font-semibold">{p.business_name}</p>
+                                                        <a href={`/u/${p.slug}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-muted hover:underline">
+                                                            /u/{p.slug}
+                                                        </a>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm text-ink">{profile.email}</span>
-                                                <span className="text-xs text-ink/50">{profile.whatsapp_e164}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-sm font-medium text-ink">
-                                                {profile.views || 0}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-ink/60 whitespace-nowrap">
-                                            {new Date(profile.created_at).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-3">
-                                                <a
-                                                    href={`/u/${profile.slug}`}
-                                                    target="_blank"
-                                                    className="text-sm font-medium text-ink/60 hover:text-ink hover:underline"
-                                                >
-                                                    View
-                                                </a>
-                                                <a
-                                                    href={`/edit/${profile.edit_token_hash}`} // Hash isn't useful for edit, but we don't have clear token here. Actually we only stored hash. We can't edit.
-                                                    // Wait, in previous step I saw 'edit_token_hash'. We can't use it to generate edit link.
-                                                    // But we have 'Add ability to view/copy edit links for support' in task.md?
-                                                    // Ah, task.md said "Add ability to view/copy edit links". But if we only store hash, we can't recover it.
-                                                    // Unless we have a recover logic.
-                                                    // For now, I'll just keep "View".
-                                                    // Admin can DELETE.
-                                                    // The user requested "add delete feature".
-                                                    className="text-sm font-medium text-red-600 hover:text-red-700 hover:underline cursor-pointer"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        handleDelete(profile.id, profile.business_name);
-                                                    }}
-                                                >
-                                                    Delete
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {filteredProfiles.length === 0 && (
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <p>{p.email}</p>
+                                                {p.whatsapp_e164 && <p className="text-xs text-muted">+{p.whatsapp_e164}</p>}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="inline-flex items-center gap-1 font-semibold">
+                                                    <EyeIcon className="h-3.5 w-3.5" /> {(p.views || 0).toLocaleString()}
+                                                </span>
+                                            </td>
+                                            <td className="whitespace-nowrap px-4 py-3 text-muted">{new Date(p.created_at).toLocaleDateString()}</td>
+                                            <td className="whitespace-nowrap px-4 py-3 text-right">
+                                                <div className="flex justify-end gap-3 text-xs font-semibold">
+                                                    <button type="button" disabled={busy === p.id} onClick={() => sendLink(p)} className="hover:underline disabled:opacity-50">
+                                                        Send edit link
+                                                    </button>
+                                                    <button type="button" disabled={busy === p.id} onClick={() => remove(p)} className="text-[#D23A3A] hover:underline disabled:opacity-50">
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {visible.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-ink/50">
-                                            {profiles.length === 0 ? "No profiles found." : "No matches found."}
+                                        <td colSpan={5} className="px-4 py-12 text-center text-muted">
+                                            {profiles.length === 0 ? 'No pages yet.' : 'No matches.'}
                                         </td>
                                     </tr>
                                 )}
@@ -387,7 +325,7 @@ export default function AdminPage() {
                         </table>
                     </div>
                 </div>
-            </div>
-        </main>
+            </main>
+        </div>
     );
 }

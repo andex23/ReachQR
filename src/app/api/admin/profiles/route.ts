@@ -1,67 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
+import { isAdminRequest, unauthorized } from '@/lib/admin-auth';
+import { handleRouteError, jsonError, readJson } from '@/lib/server-utils';
 
 export const dynamic = 'force-dynamic';
 
+const ADMIN_COLUMNS = 'id, slug, business_name, email, whatsapp_e164, logo_url, theme, views, created_at';
+
 export async function GET(request: NextRequest) {
+    if (!isAdminRequest(request)) return unauthorized();
     try {
-        // Authenticate
-        const authHeader = request.headers.get('x-admin-password');
-        const adminPassword = process.env.ADMIN_PASSWORD;
-
-        if (!adminPassword || authHeader !== adminPassword) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const supabase = getServiceClient();
-
-        // Fetch all profiles
-        const { data: profiles, error } = await supabase
+        const { data, error } = await getServiceClient()
             .from('profiles')
-            .select('*')
+            .select(ADMIN_COLUMNS)
             .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error('Database error:', error);
-            return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 });
-        }
-
-        return NextResponse.json({ profiles });
+        if (error) throw error;
+        return NextResponse.json({ profiles: data });
     } catch (error) {
-        console.error('API error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return handleRouteError(error, 'Admin list');
     }
 }
 
 export async function DELETE(request: NextRequest) {
+    if (!isAdminRequest(request)) return unauthorized();
     try {
-        const authHeader = request.headers.get('x-admin-password');
-        const adminPassword = process.env.ADMIN_PASSWORD;
+        const { id } = await readJson(request);
+        if (typeof id !== 'string' || !id) return jsonError('Profile ID required', 400);
 
-        if (!adminPassword || authHeader !== adminPassword) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const { id } = await request.json();
-
-        if (!id) {
-            return NextResponse.json({ error: 'Profile ID required' }, { status: 400 });
-        }
-
-        const supabase = getServiceClient();
-        const { error } = await supabase
-            .from('profiles')
-            .delete()
-            .eq('id', id);
-
-        if (error) {
-            console.error('Delete error:', error);
-            return NextResponse.json({ error: 'Failed to delete profile' }, { status: 500 });
-        }
+        const { error } = await getServiceClient().from('profiles').delete().eq('id', id);
+        if (error) throw error;
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Delete API error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return handleRouteError(error, 'Admin delete');
     }
 }

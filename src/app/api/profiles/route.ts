@@ -1,148 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
-import { generateEditToken, hashToken, checkRateLimit } from '@/lib/server-utils';
-import { sendEditLinkEmail } from '@/lib/email';
+import {
+    generateToken,
+    getBaseUrl,
+    getClientIp,
+    handleRouteError,
+    hashToken,
+    jsonError,
+    rateLimit,
+    readJson,
+    tooManyRequests,
+} from '@/lib/server-utils';
+import { isValidSlug, normalizeProfileInput } from '@/lib/profile';
+import { sendWelcomeEmail } from '@/lib/email';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
     try {
-        const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+        if (!(await rateLimit(`create:${getClientIp(request)}`, 5, 60 * 10))) return tooManyRequests();
 
-        if (!checkRateLimit(ip)) {
-            return NextResponse.json(
-                { error: 'You\'re creating pages too fast! Please wait a minute and try again.' },
-                { status: 429 }
-            );
+        const body = await readJson(request);
+
+        // Bots fill the hidden field; pretend it worked.
+        if (body.website_confirm) {
+            return NextResponse.json({ success: true, slug: 'ok', editToken: generateToken() });
         }
 
-        const body = await request.json();
-
-        // Check honeypot field
-        if (body.honeypot) {
-            return NextResponse.json({
-                success: true,
-                slug: 'fake-slug',
-                editToken: 'fake-token'
-            });
+        const slug = typeof body.slug === 'string' ? body.slug.trim().toLowerCase() : '';
+        if (!isValidSlug(slug)) {
+            return jsonError('Your link must be 2–50 letters, numbers or dashes', 400, { field: 'slug' });
         }
 
-        const {
-            slug,
-            business_name,
-            tagline,
-            logo_url,
-            whatsapp_e164,
-            phone,
-            email,
-            instagram,
-            twitter,
-            tiktok,
-            facebook,
-            linkedin,
-            youtube,
-            website,
-            address,
-        } = body;
+        const parsed = normalizeProfileInput(body);
+        if (!parsed.ok) return jsonError(parsed.error, 400, { field: parsed.field });
 
-        // Validate required fields
-        if (!business_name?.trim()) {
-            return NextResponse.json({ error: 'Please enter your business name' }, { status: 400 });
-        }
-        if (!slug?.trim()) {
-            return NextResponse.json({ error: 'Please choose a unique link' }, { status: 400 });
-        }
-        if (!email?.trim()) {
-            return NextResponse.json({ error: 'Please enter your email' }, { status: 400 });
-        }
-        if (!whatsapp_e164?.trim()) {
-            return NextResponse.json({ error: 'Please enter your WhatsApp number' }, { status: 400 });
-        }
-
-        // Generate edit token
-        const editToken = generateEditToken();
-        const editTokenHash = hashToken(editToken);
-
-        // Format social URLs
-        const formatSocialUrl = (platform: string, handle: string | null) => {
-            if (!handle) return null;
-            const cleanHandle = handle.replace(/^@/, '');
-            switch (platform) {
-                case 'instagram': return `https://instagram.com/${cleanHandle}`;
-                case 'twitter': return `https://x.com/${cleanHandle}`;
-                case 'tiktok': return `https://tiktok.com/@${cleanHandle}`;
-                case 'facebook': return `https://facebook.com/${cleanHandle}`;
-                case 'linkedin': return `https://linkedin.com/in/${cleanHandle}`;
-                case 'youtube': return `https://youtube.com/${cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle}`;
-                default: return null;
-            }
-        };
-
-        let formattedWebsite = null;
-        if (website) {
-            let url = website.trim();
-            if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                url = 'https://' + url;
-            }
-            formattedWebsite = url;
-        }
-
-        let supabase;
-        try {
-            supabase = getServiceClient();
-        } catch {
-            return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
-        }
-
-        const { data, error } = await supabase
+        const editToken = generateToken();
+        const { data, error } = await getServiceClient()
             .from('profiles')
-            .insert({
-                slug: slug.toLowerCase().trim(),
-                business_name: business_name.trim(),
-                tagline: tagline?.trim() || null,
-                logo_url: logo_url?.trim() || null,
-                whatsapp_e164: whatsapp_e164.trim(),
-                phone: phone?.trim() || null,
-                email: email.toLowerCase().trim(),
-                instagram_url: formatSocialUrl('instagram', instagram),
-                twitter_url: formatSocialUrl('twitter', twitter),
-                tiktok_url: formatSocialUrl('tiktok', tiktok),
-                facebook_url: formatSocialUrl('facebook', facebook),
-                linkedin_url: formatSocialUrl('linkedin', linkedin),
-                youtube_url: formatSocialUrl('youtube', youtube),
-                website_url: formattedWebsite,
-                address: address?.trim() || null,
-                edit_token_hash: editTokenHash,
-            })
-            .select('id, slug')
+            .insert({ ...parsed.value, slug, edit_token_hash: hashToken(editToken) })
+            .select('slug')
             .single();
 
         if (error) {
-            console.error('Supabase error:', error);
-            if (error.code === '23505') {
-                return NextResponse.json({ error: 'This name is already taken' }, { status: 409 });
-            }
-            return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
+            if (error.code === '23505') return jsonError('That link is already taken', 409, { field: 'slug' });
+            throw error;
         }
 
-        // Get base URL for email links
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-        const publicLink = `${baseUrl}/u/${data.slug}`;
-        const editLink = `${baseUrl}/edit/${editToken}`;
-
-        // Send email with edit link (non-blocking)
-        sendEditLinkEmail({
-            to: email.toLowerCase().trim(),
-            businessName: business_name.trim(),
-            editLink,
-            publicLink,
-        }).catch(err => console.error('Failed to send email:', err));
-
-        return NextResponse.json({
-            success: true,
-            slug: data.slug,
-            editToken,
+        const baseUrl = getBaseUrl(request);
+        await sendWelcomeEmail({
+            to: parsed.value.email,
+            businessName: parsed.value.business_name,
+            editLink: `${baseUrl}/edit/${editToken}`,
+            publicLink: `${baseUrl}/u/${data.slug}`,
         });
+
+        return NextResponse.json({ success: true, slug: data.slug, editToken });
     } catch (error) {
-        console.error('API error:', error);
-        return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
+        return handleRouteError(error, 'Create profile');
     }
 }

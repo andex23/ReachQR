@@ -1,94 +1,226 @@
 import Link from 'next/link';
-import HowItWorks from '../components/HowItWorks';
+import QRCode from 'qrcode';
+import { SiteFooter, SiteHeader } from '@/components/Brand';
+import PhoneFrame from '@/components/PhoneFrame';
+import ProfileCard from '@/components/ProfileCard';
+import {
+    ArrowRightIcon,
+    BoltIcon,
+    ContactCardIcon,
+    LockIcon,
+    PaletteIcon,
+    PrinterIcon,
+    WhatsAppIcon,
+} from '@/components/icons';
+import { CardData, mapsLink, whatsappLink } from '@/lib/profile';
+import { THEMES } from '@/lib/themes';
 
-export default function HomePage() {
+const DEMO: CardData = {
+    slug: 'mama-tees-kitchen',
+    businessName: 'Mama Tee’s Kitchen',
+    tagline: 'Home-cooked jollof & small chops · Lekki',
+    logoUrl: null,
+    theme: 'sunset',
+    whatsappUrl: whatsappLink('2348012345678'),
+    phone: '+234 801 234 5678',
+    email: 'orders@mamatees.ng',
+    mapsUrl: mapsLink('Lekki Phase 1, Lagos'),
+    address: 'Lekki Phase 1, Lagos',
+    website: null,
+    socials: [
+        { key: 'instagram', label: 'Instagram', url: 'https://instagram.com' },
+        { key: 'tiktok', label: 'TikTok', url: 'https://tiktok.com' },
+        { key: 'facebook', label: 'Facebook', url: 'https://facebook.com' },
+    ],
+};
+
+const FEATURES = [
+    { icon: WhatsAppIcon, title: 'WhatsApp first', body: 'One tap opens a chat with a greeting you choose. No saving numbers, no typos.' },
+    { icon: PrinterIcon, title: 'Print-ready', body: 'Download a crisp PNG, a scalable SVG, or a ready-made sign for your counter.' },
+    { icon: PaletteIcon, title: 'Six themes', body: 'Pick a look that matches your brand. Switch any time.' },
+    { icon: ContactCardIcon, title: 'Save contact', body: 'Customers add you to their phone in one tap, with your logo and links.' },
+    { icon: BoltIcon, title: 'Edit, never reprint', body: 'Change your number or links whenever you like. Your QR code stays the same.' },
+    { icon: LockIcon, title: 'Free, no account', body: 'No passwords, no monthly fees. A private link lets you edit your page.' },
+];
+
+const STEPS = [
+    { n: '01', title: 'Fill in your details', body: 'Business name, WhatsApp, socials. Takes about a minute.' },
+    { n: '02', title: 'Get your QR code', body: 'Download it or a printable sign, ready for cards, stickers and packaging.' },
+    { n: '03', title: 'Customers reach you', body: 'They scan, tap and they’re chatting with you. No app needed.' },
+];
+
+const FAQ = [
+    { q: 'Is it really free?', a: 'Yes. Creating a page, downloading your QR code and editing it are all free.' },
+    { q: 'Do I need an account?', a: 'No. When you create a page we give you a private edit link and email you a copy. Lose it? Request a new one from the Recover page with your email.' },
+    { q: 'If I change my number, do I need a new QR code?', a: 'No. The QR code points to your page, not to your number. Update the page and every printed code updates with it.' },
+    { q: 'Do customers need an app?', a: 'No. Any phone camera can scan the code, and the page opens in their browser.' },
+];
+
+const USES = ['Business cards', 'Shop windows', 'Packaging', 'Menus', 'Flyers', 'Market stalls', 'Delivery bags', 'Receipts'];
+
+export default async function HomePage() {
+    const qrSvg = await QRCode.toString(process.env.NEXT_PUBLIC_BASE_URL || 'https://reachqr.vercel.app', {
+        type: 'svg',
+        margin: 0,
+        color: { dark: '#141414', light: '#00000000' },
+    });
+
     return (
-        <main className="min-h-screen flex flex-col">
-            {/* Hero */}
-            <div className="flex-1 flex flex-col items-center justify-center px-4 py-16">
-                <div className="max-w-3xl mx-auto text-center">
-                    {/* Logo */}
-                    <h1 className="text-3xl md:text-5xl font-mono font-semibold text-ink mb-6">
-                        Reach<span className="text-ink/40">QR</span>
-                    </h1>
+        <>
+            <SiteHeader />
 
-                    {/* Headline */}
-                    <p className="text-3xl md:text-5xl font-mono text-ink mb-6 leading-tight">
-                        One scan. Instant contact.
-                    </p>
-
-                    {/* Subhead */}
-                    <p className="text-ink/60 mb-10 max-w-xl mx-auto text-lg md:text-xl">
-                        Create a QR code that opens your contact page. Perfect for business cards, storefronts, and packaging.
-                    </p>
-
-                    {/* CTA */}
-                    <Link href="/create" className="btn-primary inline-block px-10 py-4 text-lg">
-                        Get Started Free
-                    </Link>
-                </div>
-            </div>
-
-            {/* Features Section */}
-            <div className="border-t border-border py-20 px-4">
-                <div className="max-w-5xl mx-auto">
-                    <h2 className="text-center text-xl md:text-2xl font-mono font-medium text-ink mb-16">
-                        Everything you need. Nothing you don&apos;t.
-                    </h2>
-
-                    <div className="grid md:grid-cols-3 gap-12 text-center">
-                        {/* WhatsApp Ready */}
-                        <div>
-                            <div className="w-16 h-16 bg-ink/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                                <svg className="w-8 h-8 text-ink" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-                                </svg>
-                            </div>
-                            <h3 className="font-medium text-ink mb-3 text-lg">WhatsApp Ready</h3>
-                            <p className="text-ink/60 leading-relaxed">
-                                One tap opens a WhatsApp chat with your business. No phone numbers to save.
-                            </p>
+            <main>
+                {/* Hero */}
+                <section className="mx-auto grid max-w-6xl items-center gap-14 px-4 pb-20 pt-12 sm:px-6 lg:grid-cols-[1.15fr_1fr] lg:pt-20">
+                    <div className="animate-fade-up">
+                        <span className="chip">
+                            <span className="h-2 w-2 rounded-full bg-[#1E6B40]" /> Free · No account · 60 seconds
+                        </span>
+                        <h1 className="mt-6 text-5xl font-extrabold leading-[0.95] sm:text-7xl">
+                            One scan.
+                            <br />
+                            <span className="relative inline-block">
+                                <span className="relative z-10">Instant contact.</span>
+                                <span className="absolute inset-x-0 bottom-1 -z-0 h-4 rounded bg-accent sm:bottom-2 sm:h-6" />
+                            </span>
+                        </h1>
+                        <p className="mt-6 max-w-lg text-lg text-muted sm:text-xl">
+                            Turn your business card, shop window or packaging into a WhatsApp button. Make a free contact page and QR code in a minute.
+                        </p>
+                        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                            <Link href="/create" className="btn-accent px-7 py-4 text-lg">
+                                Create my free page <ArrowRightIcon />
+                            </Link>
+                            <Link href="#how" className="btn-secondary px-7 py-4 text-lg">
+                                How it works
+                            </Link>
                         </div>
+                        <p className="mt-6 text-sm text-muted">Already have a page? <Link href="/recover" className="font-semibold text-ink underline">Get your edit link</Link></p>
+                    </div>
 
-                        {/* Print & Share */}
-                        <div>
-                            <div className="w-16 h-16 bg-ink/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                                <svg className="w-8 h-8 text-ink" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
-                                </svg>
-                            </div>
-                            <h3 className="font-medium text-ink mb-3 text-lg">Print Anywhere</h3>
-                            <p className="text-ink/60 leading-relaxed">
-                                Download your QR code and print it on cards, stickers, menus, or packaging.
-                            </p>
-                        </div>
-
-                        {/* Instant Setup */}
-                        <div>
-                            <div className="w-16 h-16 bg-ink/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                                <svg className="w-8 h-8 text-ink" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                                </svg>
-                            </div>
-                            <h3 className="font-medium text-ink mb-3 text-lg">60-Second Setup</h3>
-                            <p className="text-ink/60 leading-relaxed">
-                                No accounts, no monthly fees. Just fill in your details and you&apos;re live.
-                            </p>
+                    <div className="relative animate-fade-up">
+                        <PhoneFrame themeId={DEMO.theme} className="rotate-[1.5deg]">
+                            <ProfileCard card={DEMO} preview />
+                        </PhoneFrame>
+                        <div className="absolute -bottom-6 -left-2 hidden w-36 -rotate-6 rounded-2xl border-2 border-ink bg-white p-3 shadow-hard sm:block lg:-left-10">
+                            <div className="aspect-square [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+                            <p className="mt-2 text-center font-mono text-[10px] font-semibold uppercase tracking-widest">Scan me</p>
                         </div>
                     </div>
-                </div>
-            </div>
+                </section>
 
-            {/* How It Works */}
-            <HowItWorks />
+                {/* Uses strip */}
+                <section className="overflow-hidden border-y-2 border-ink bg-ink py-4 text-paper">
+                    <div className="flex w-max gap-10 whitespace-nowrap font-display text-xl font-bold motion-safe:animate-[marquee_30s_linear_infinite]">
+                        {[...USES, ...USES].map((u, i) => (
+                            <span key={i} className="flex items-center gap-10">
+                                {u} <span className="text-accent">✦</span>
+                            </span>
+                        ))}
+                    </div>
+                </section>
 
-            {/* Footer */}
-            <footer className="border-t border-border py-8 px-4 text-center">
-                <p className="text-sm text-ink/40">
-                    &copy; {new Date().getFullYear()} ReachQR
-                </p>
-            </footer>
-        </main>
+                {/* Features */}
+                <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-28">
+                    <p className="eyebrow">Why ReachQR</p>
+                    <h2 className="mt-3 max-w-2xl text-4xl font-bold sm:text-5xl">Everything you need. Nothing you don’t.</h2>
+                    <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                        {FEATURES.map((f) => (
+                            <div key={f.title} className="rounded-2xl border-2 border-ink bg-white p-6 transition-transform hover:-translate-y-1 hover:shadow-hard">
+                                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-ink bg-accent">
+                                    <f.icon className="h-6 w-6" />
+                                </div>
+                                <h3 className="text-xl font-bold">{f.title}</h3>
+                                <p className="mt-2 text-muted">{f.body}</p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* How it works */}
+                <section id="how" className="scroll-mt-20 border-y-2 border-ink bg-white">
+                    <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-28">
+                        <p className="eyebrow">How it works</p>
+                        <h2 className="mt-3 text-4xl font-bold sm:text-5xl">Live in three steps.</h2>
+                        <ol className="mt-12 grid gap-8 md:grid-cols-3">
+                            {STEPS.map((s) => (
+                                <li key={s.n} className="border-t-2 border-ink pt-6">
+                                    <span className="font-mono text-sm font-semibold text-muted">{s.n}</span>
+                                    <h3 className="mt-3 text-2xl font-bold">{s.title}</h3>
+                                    <p className="mt-2 text-muted">{s.body}</p>
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+                </section>
+
+                {/* Themes */}
+                <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-28">
+                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                        <div>
+                            <p className="eyebrow">Themes</p>
+                            <h2 className="mt-3 text-4xl font-bold sm:text-5xl">Make it yours.</h2>
+                        </div>
+                        <Link href="/create" className="btn-secondary self-start sm:self-auto">
+                            Try them out <ArrowRightIcon />
+                        </Link>
+                    </div>
+                    <div className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                        {THEMES.map((t) => (
+                            <div key={t.id} className="rounded-2xl border-2 border-ink p-3" style={{ background: t.bg }}>
+                                <div className="rounded-xl p-4" style={{ background: t.card, border: `2px solid ${t.border}`, color: t.text }}>
+                                    <div className="mx-auto mb-3 h-10 w-10 rounded-full" style={{ background: t.accent, border: `2px solid ${t.border}` }} />
+                                    <div className="mx-auto mb-1.5 h-2 w-3/4 rounded-full" style={{ background: t.text }} />
+                                    <div className="mx-auto mb-4 h-1.5 w-1/2 rounded-full" style={{ background: t.muted }} />
+                                    <div className="h-7 rounded-lg" style={{ background: t.accent, border: `2px solid ${t.border}` }} />
+                                    <div className="mt-2 grid grid-cols-2 gap-1.5">
+                                        <div className="h-5 rounded-md" style={{ border: `2px solid ${t.border}` }} />
+                                        <div className="h-5 rounded-md" style={{ border: `2px solid ${t.border}` }} />
+                                    </div>
+                                </div>
+                                <p className="mt-2 text-center text-sm font-semibold" style={{ color: t.id === 'midnight' ? '#F4F4F5' : '#141414' }}>
+                                    {t.name}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* FAQ */}
+                <section className="border-t-2 border-ink bg-white">
+                    <div className="mx-auto grid max-w-6xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.5fr] lg:py-28">
+                        <div>
+                            <p className="eyebrow">FAQ</p>
+                            <h2 className="mt-3 text-4xl font-bold sm:text-5xl">Questions, answered.</h2>
+                        </div>
+                        <div className="divide-y-2 divide-ink border-y-2 border-ink">
+                            {FAQ.map((f) => (
+                                <details key={f.q} className="group py-5">
+                                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-display text-lg font-bold [&::-webkit-details-marker]:hidden">
+                                        {f.q}
+                                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-ink text-lg transition-transform group-open:rotate-45">
+                                            +
+                                        </span>
+                                    </summary>
+                                    <p className="mt-3 max-w-xl text-muted">{f.a}</p>
+                                </details>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* CTA */}
+                <section className="border-t-2 border-ink bg-accent">
+                    <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 px-4 py-16 sm:px-6 md:flex-row md:items-center">
+                        <h2 className="max-w-xl text-4xl font-extrabold leading-tight sm:text-5xl">Your customers are one scan away.</h2>
+                        <Link href="/create" className="btn-primary px-8 py-4 text-lg">
+                            Create my free page <ArrowRightIcon />
+                        </Link>
+                    </div>
+                </section>
+            </main>
+
+            <SiteFooter />
+        </>
     );
 }

@@ -1,27 +1,24 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
-interface ViewTrackerProps {
-    slug: string;
-}
-
-export default function ViewTracker({ slug }: ViewTrackerProps) {
-    const tracked = useRef(false);
-
+export default function ViewTracker({ slug }: { slug: string }) {
     useEffect(() => {
-        if (tracked.current) return;
-        tracked.current = true;
+        const key = `rq_viewed_${slug}`;
+        try {
+            if (sessionStorage.getItem(key)) return;
+            sessionStorage.setItem(key, '1');
+        } catch {
+            // storage blocked: still count the view
+        }
 
-        // Track view asynchronously
         fetch('/api/views', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slug })
-        }).catch(() => {
-            // Silently fail - view tracking is non-critical
-        });
+            body: JSON.stringify({ slug }),
+            keepalive: true,
+        }).catch(() => {});
     }, [slug]);
 
-    return null; // This component renders nothing
+    return null;
 }
